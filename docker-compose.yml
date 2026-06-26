@@ -1,0 +1,10 @@
+# Billetera Digital (banca) — frontend
+
+services:
+  web:
+    build: .
+    image: banca:dev
+    container_name: banca
+    ports:
+      - "3000:3000"
+    restart: unless-stopped
