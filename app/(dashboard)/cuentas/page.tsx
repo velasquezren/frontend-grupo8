@@ -128,30 +128,30 @@ export default function CuentasPage() {
       <PageHeader title="Cuentas" description="Gestiona las cuentas bancarias de la plataforma">
         <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) resetForm() }}>
           <DialogTrigger render={
-            <Button onClick={openCreateDialog}>
+            <Button onClick={openCreateDialog} className="shadow-[0_0_15px_rgba(20,184,166,0.25)] hover:shadow-[0_0_25px_rgba(20,184,166,0.35)] transition-all">
               <Plus className="h-4 w-4 mr-2" />
               Nueva Cuenta
             </Button>
           } />
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>{editingAccount ? 'Editar Cuenta' : 'Crear Nueva Cuenta'}</DialogTitle>
-              <DialogDescription>
+              <DialogTitle className="font-bold">{editingAccount ? 'Editar Cuenta' : 'Crear Nueva Cuenta'}</DialogTitle>
+              <DialogDescription className="text-xs text-muted-foreground">
                 {editingAccount ? 'Modifica los datos de la cuenta.' : 'Ingresa los datos del nuevo titular.'}
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4 py-4">
               <div className="space-y-2">
-                <Label htmlFor="titular">Titular</Label>
+                <Label htmlFor="titular" className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Titular</Label>
                 <Input id="titular" placeholder="Nombre completo" value={formTitular} onChange={(e) => setFormTitular(e.target.value)} />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
+                <Label htmlFor="email" className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Email</Label>
                 <Input id="email" type="email" placeholder="correo@ejemplo.com" value={formEmail} onChange={(e) => setFormEmail(e.target.value)} />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label>Tipo de Cuenta</Label>
+                  <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Tipo de Cuenta</Label>
                   <Select value={formTipo} onValueChange={(v) => setFormTipo((v || 'ahorro') as 'ahorro' | 'corriente')}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
@@ -161,14 +161,14 @@ export default function CuentasPage() {
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="saldo">Saldo Inicial</Label>
-                  <Input id="saldo" type="number" step="0.01" min="0" placeholder="0.00" value={formSaldo} onChange={(e) => setFormSaldo(e.target.value)} />
+                  <Label htmlFor="saldo" className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Saldo Inicial</Label>
+                  <Input id="saldo" type="number" step="0.01" min="0" placeholder="0.00" className="font-mono" value={formSaldo} onChange={(e) => setFormSaldo(e.target.value)} />
                 </div>
               </div>
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => { setDialogOpen(false); resetForm() }}>Cancelar</Button>
-              <Button onClick={handleSave}>{editingAccount ? 'Guardar Cambios' : 'Crear Cuenta'}</Button>
+              <Button className="shadow-[0_0_15px_rgba(20,184,166,0.2)]" onClick={handleSave}>{editingAccount ? 'Guardar Cambios' : 'Crear Cuenta'}</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
@@ -176,21 +176,24 @@ export default function CuentasPage() {
 
       {/* Stats */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <StatCard title="Saldo Total" value={formatCurrency(totalBalance)} icon={DollarSign} />
-        <StatCard title="Cuentas Activas" value={String(activeCount)} icon={CreditCard} description={`De ${accounts.length} registradas`} />
-        <StatCard title="Cuentas Totales" value={String(accounts.length)} icon={Wallet} />
+        <StatCard title="Saldo Total" value={formatCurrency(totalBalance)} icon={DollarSign} className="hover:border-primary/20 transition-all duration-300" />
+        <StatCard title="Cuentas Activas" value={String(activeCount)} icon={CreditCard} description={`De ${accounts.length} registradas`} className="hover:border-primary/20 transition-all duration-300" />
+        <StatCard title="Cuentas Totales" value={String(accounts.length)} icon={Wallet} className="hover:border-primary/20 transition-all duration-300" />
       </div>
 
       {/* Search + Table */}
-      <Card>
+      <Card className="backdrop-blur-md shadow-lg">
         <CardHeader>
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <CardTitle className="text-base">Listado de Cuentas</CardTitle>
+            <div className="space-y-1">
+              <CardTitle className="text-base font-bold tracking-tight">Listado de Cuentas</CardTitle>
+              <p className="text-xs text-muted-foreground">Administra y filtra los estados de cuenta globales.</p>
+            </div>
             <div className="relative w-full sm:w-72">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
                 placeholder="Buscar por titular, cuenta o email..."
-                className="pl-9"
+                className="pl-9 placeholder:text-muted-foreground/60"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
@@ -200,34 +203,42 @@ export default function CuentasPage() {
         <CardContent>
           <Table>
             <TableHeader>
-              <TableRow>
-                <TableHead>Titular</TableHead>
-                <TableHead className="hidden md:table-cell">Nro. Cuenta</TableHead>
-                <TableHead className="hidden sm:table-cell">Tipo</TableHead>
-                <TableHead>Estado</TableHead>
-                <TableHead className="text-right">Saldo</TableHead>
+              <TableRow className="hover:bg-transparent border-border">
+                <TableHead className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Titular</TableHead>
+                <TableHead className="hidden md:table-cell text-xs font-semibold text-muted-foreground uppercase tracking-wider">Nro. Cuenta</TableHead>
+                <TableHead className="hidden sm:table-cell text-xs font-semibold text-muted-foreground uppercase tracking-wider">Tipo</TableHead>
+                <TableHead className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Estado</TableHead>
+                <TableHead className="text-right text-xs font-semibold text-muted-foreground uppercase tracking-wider">Saldo</TableHead>
                 <TableHead className="w-12" />
               </TableRow>
             </TableHeader>
             <TableBody>
               {filteredAccounts.map((account) => {
                 const stateConfig = ACCOUNT_STATES[account.estado]
+                const isActive = account.estado === 'activa'
                 return (
-                  <TableRow key={account.id}>
+                  <TableRow key={account.id} className="hover:bg-muted/50 border-border transition-colors">
                     <TableCell>
                       <div>
-                        <p className="font-medium text-sm">{account.titular}</p>
+                        <p className="font-bold text-sm text-foreground">{account.titular}</p>
                         <p className="text-xs text-muted-foreground">{account.email}</p>
                       </div>
                     </TableCell>
-                    <TableCell className="hidden md:table-cell font-mono text-sm">{account.numeroCuenta}</TableCell>
+                    <TableCell className="hidden md:table-cell font-mono text-xs text-muted-foreground">{account.numeroCuenta}</TableCell>
                     <TableCell className="hidden sm:table-cell">
-                      <Badge variant="outline">{ACCOUNT_TYPES[account.tipo]}</Badge>
+                      <Badge variant="outline" className="font-mono text-[10px] uppercase tracking-wide px-2 py-0.5 text-muted-foreground">
+                        {ACCOUNT_TYPES[account.tipo]}
+                      </Badge>
                     </TableCell>
                     <TableCell>
-                      <Badge variant={stateConfig.variant}>{stateConfig.label}</Badge>
+                      <Badge variant={stateConfig.variant} className="relative pl-5 font-medium border-none py-0.5 text-[10px]">
+                        <span className={`absolute left-2 top-1/2 -translate-y-1/2 flex h-1.5 w-1.5 rounded-full ${isActive ? 'bg-emerald-500 dark:bg-emerald-400' : 'bg-slate-400'}`}>
+                          {isActive && <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-500 dark:bg-emerald-400 opacity-75"></span>}
+                        </span>
+                        {stateConfig.label}
+                      </Badge>
                     </TableCell>
-                    <TableCell className="text-right font-mono tabular-nums font-semibold text-sm">
+                    <TableCell className="text-right font-mono tabular-nums font-bold text-sm text-primary">
                       {formatCurrency(account.saldo)}
                     </TableCell>
                     <TableCell>
@@ -245,15 +256,15 @@ export default function CuentasPage() {
                           </DropdownMenuItem>
                           <AlertDialog>
                             <AlertDialogTrigger render={
-                              <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive">
+                              <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive hover:bg-destructive/10">
                                 <Trash2 className="mr-2 h-4 w-4" />
                                 Eliminar
                               </DropdownMenuItem>
                             } />
                             <AlertDialogContent>
                               <AlertDialogHeader>
-                                <AlertDialogTitle>¿Eliminar cuenta?</AlertDialogTitle>
-                                <AlertDialogDescription>
+                                <AlertDialogTitle className="font-bold">¿Eliminar cuenta?</AlertDialogTitle>
+                                <AlertDialogDescription className="text-xs text-muted-foreground">
                                   Esta acción eliminará la cuenta de {account.titular} ({account.numeroCuenta}). No se puede deshacer.
                                 </AlertDialogDescription>
                               </AlertDialogHeader>
@@ -273,8 +284,11 @@ export default function CuentasPage() {
               })}
               {filteredAccounts.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
-                    No se encontraron cuentas.
+                  <TableCell colSpan={6} className="h-32 text-center text-xs text-muted-foreground">
+                    <div className="flex flex-col items-center justify-center space-y-2">
+                      <Search className="h-8 w-8 text-muted-foreground/30" />
+                      <p>No se encontraron cuentas con el criterio de búsqueda.</p>
+                    </div>
                   </TableCell>
                 </TableRow>
               )}

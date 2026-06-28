@@ -136,10 +136,10 @@ export default function TransferenciasPage() {
 
       {/* Stats */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard title="Total Transferido" value={formatCurrency(totalTransferred)} icon={ArrowLeftRight} />
-        <StatCard title="Completadas" value={String(completedCount)} icon={CheckCircle2} />
-        <StatCard title="Rechazadas" value={String(rejectedCount)} icon={XCircle} />
-        <StatCard title="Límite Alerta" value={formatCurrency(MONTO_ALERTA_ELEVADO)} icon={AlertTriangle} description="Montos elevados" />
+        <StatCard title="Total Transferido" value={formatCurrency(totalTransferred)} icon={ArrowLeftRight} className="hover:border-primary/20 transition-all duration-300" />
+        <StatCard title="Completadas" value={String(completedCount)} icon={CheckCircle2} className="hover:border-primary/20 transition-all duration-300" />
+        <StatCard title="Rechazadas" value={String(rejectedCount)} icon={XCircle} className="hover:border-primary/20 transition-all duration-300" />
+        <StatCard title="Límite Alerta" value={formatCurrency(MONTO_ALERTA_ELEVADO)} icon={AlertTriangle} description="Montos elevados" className="hover:border-primary/20 transition-all duration-300" />
       </div>
 
       <Tabs defaultValue="nueva" className="space-y-6">
@@ -150,27 +150,29 @@ export default function TransferenciasPage() {
 
         {/* New Transfer Form */}
         <TabsContent value="nueva">
-          <Card>
+          <Card className="backdrop-blur-md shadow-lg">
             <CardHeader>
-              <CardTitle className="text-base flex items-center gap-2">
-                <Send className="h-4 w-4 text-primary" />
-                Realizar Transferencia
-              </CardTitle>
-              <CardDescription>
-                Selecciona las cuentas y el monto. Se validará el saldo disponible antes de procesar.
-              </CardDescription>
+              <div className="space-y-1">
+                <CardTitle className="text-base font-bold tracking-tight flex items-center gap-2">
+                  <Send className="h-4 w-4 text-primary" />
+                  Realizar Transferencia
+                </CardTitle>
+                <CardDescription className="text-xs text-muted-foreground">
+                  Selecciona las cuentas y el monto. Se validará el saldo disponible antes de procesar.
+                </CardDescription>
+              </div>
             </CardHeader>
             <CardContent>
               <div className="grid gap-6 md:grid-cols-2">
                 <div className="space-y-4">
                   <div className="space-y-2">
-                    <Label>Cuenta de Origen</Label>
+                    <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Cuenta de Origen</Label>
                     <Select value={origenId} onValueChange={(v) => setOrigenId(v || '')}>
                       <SelectTrigger><SelectValue placeholder="Seleccionar cuenta de origen" /></SelectTrigger>
                       <SelectContent>
                         {activeAccounts.map((a) => (
                           <SelectItem key={a.id} value={a.id}>
-                            <div className="flex items-center justify-between w-full gap-4">
+                            <div className="flex items-center justify-between w-full gap-4 text-sm">
                               <span>{a.titular}</span>
                               <span className="text-xs text-muted-foreground font-mono">
                                 {a.numeroCuenta} · {formatCurrency(a.saldo)}
@@ -183,7 +185,7 @@ export default function TransferenciasPage() {
                     {origenId && (
                       <p className="text-xs text-muted-foreground">
                         Saldo disponible:{' '}
-                        <span className="font-mono font-semibold">
+                        <span className="font-mono font-semibold text-primary">
                           {formatCurrency(accounts.find((a) => a.id === origenId)?.saldo ?? 0)}
                         </span>
                       </p>
@@ -191,7 +193,7 @@ export default function TransferenciasPage() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label>Cuenta de Destino</Label>
+                    <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Cuenta de Destino</Label>
                     <Select value={destinoId} onValueChange={(v) => setDestinoId(v || '')}>
                       <SelectTrigger><SelectValue placeholder="Seleccionar cuenta de destino" /></SelectTrigger>
                       <SelectContent>
@@ -199,7 +201,7 @@ export default function TransferenciasPage() {
                           .filter((a) => a.id !== origenId)
                           .map((a) => (
                             <SelectItem key={a.id} value={a.id}>
-                              <div className="flex items-center justify-between w-full gap-4">
+                              <div className="flex items-center justify-between w-full gap-4 text-sm">
                                 <span>{a.titular}</span>
                                 <span className="text-xs text-muted-foreground font-mono">{a.numeroCuenta}</span>
                               </div>
@@ -212,7 +214,7 @@ export default function TransferenciasPage() {
 
                 <div className="space-y-4">
                   <div className="space-y-2">
-                    <Label htmlFor="monto">Monto (BOB)</Label>
+                    <Label htmlFor="monto" className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Monto (BOB)</Label>
                     <Input
                       id="monto"
                       type="number"
@@ -224,15 +226,15 @@ export default function TransferenciasPage() {
                       onChange={(e) => setMonto(e.target.value)}
                     />
                     {Number(monto) >= MONTO_ALERTA_ELEVADO && (
-                      <p className="text-xs text-amber-500 flex items-center gap-1">
-                        <AlertTriangle className="h-3 w-3" />
-                        Este monto generará una alerta de monto elevado
+                      <p className="text-xs text-amber-600 dark:text-amber-500 flex items-center gap-1">
+                        <AlertTriangle className="h-3.5 w-3.5 animate-pulse" />
+                        Este monto generará una alerta de monto elevado (≥ {formatCurrency(MONTO_ALERTA_ELEVADO)})
                       </p>
                     )}
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="concepto">Concepto</Label>
+                    <Label htmlFor="concepto" className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Concepto</Label>
                     <Textarea
                       id="concepto"
                       placeholder="Descripción de la transferencia"
@@ -247,6 +249,7 @@ export default function TransferenciasPage() {
               <div className="mt-6 flex justify-end">
                 <Button
                   size="lg"
+                  className="shadow-[0_0_15px_rgba(20,184,166,0.2)] hover:shadow-[0_0_25px_rgba(20,184,166,0.35)] transition-all hover:scale-[1.01]"
                   onClick={handleTransfer}
                   disabled={isProcessing || !origenId || !destinoId || !monto}
                 >
@@ -269,53 +272,61 @@ export default function TransferenciasPage() {
 
         {/* Transfer History */}
         <TabsContent value="historial">
-          <Card>
+          <Card className="backdrop-blur-md shadow-lg">
             <CardHeader>
-              <CardTitle className="text-base">Historial de Transferencias</CardTitle>
-              <CardDescription>Todas las transferencias realizadas en la plataforma</CardDescription>
+              <div className="space-y-1">
+                <CardTitle className="text-base font-bold tracking-tight">Historial de Transferencias</CardTitle>
+                <CardDescription className="text-xs text-muted-foreground">Todas las transferencias registradas en la plataforma</CardDescription>
+              </div>
             </CardHeader>
             <CardContent>
               <Table>
                 <TableHeader>
-                  <TableRow>
-                    <TableHead>ID</TableHead>
-                    <TableHead>Origen → Destino</TableHead>
-                    <TableHead className="hidden md:table-cell">Concepto</TableHead>
-                    <TableHead className="hidden sm:table-cell">Fecha</TableHead>
-                    <TableHead>Estado</TableHead>
-                    <TableHead className="text-right">Monto</TableHead>
+                  <TableRow className="hover:bg-transparent border-border">
+                    <TableHead className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">ID</TableHead>
+                    <TableHead className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Origen → Destino</TableHead>
+                    <TableHead className="hidden md:table-cell text-xs font-semibold text-muted-foreground uppercase tracking-wider">Concepto</TableHead>
+                    <TableHead className="hidden sm:table-cell text-xs font-semibold text-muted-foreground uppercase tracking-wider">Fecha</TableHead>
+                    <TableHead className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Estado</TableHead>
+                    <TableHead className="text-right text-xs font-semibold text-muted-foreground uppercase tracking-wider">Monto</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {transfers.map((tx) => {
                     const stateConfig = TRANSFER_STATES[tx.estado]
+                    const isCompleted = tx.estado === 'completada'
                     return (
-                      <TableRow key={tx.id}>
+                      <TableRow key={tx.id} className="hover:bg-muted/50 border-border transition-colors">
                         <TableCell className="font-mono text-xs text-muted-foreground">{tx.id}</TableCell>
                         <TableCell>
                           <div className="flex items-center gap-2">
                             <div>
-                              <p className="text-sm font-medium">{tx.titularOrigen}</p>
+                              <p className="text-sm font-bold text-foreground">{tx.titularOrigen}</p>
                               <p className="text-xs text-muted-foreground flex items-center gap-1">
-                                <ArrowUpRight className="h-3 w-3" />
+                                <ArrowUpRight className="h-3 w-3 text-primary" />
                                 {tx.titularDestino}
                               </p>
                             </div>
                           </div>
                         </TableCell>
-                        <TableCell className="hidden md:table-cell text-sm text-muted-foreground max-w-[200px] truncate">
+                        <TableCell className="hidden md:table-cell text-xs text-muted-foreground max-w-[200px] truncate">
                           {tx.concepto}
                         </TableCell>
                         <TableCell className="hidden sm:table-cell text-xs text-muted-foreground">
                           {formatDate(tx.fechaCreacion)}
                         </TableCell>
                         <TableCell>
-                          <Badge variant={stateConfig.variant}>{stateConfig.label}</Badge>
+                          <Badge variant={stateConfig.variant} className="relative pl-5 font-medium border-none py-0.5 text-[10px]">
+                            <span className={`absolute left-2 top-1/2 -translate-y-1/2 flex h-1.5 w-1.5 rounded-full ${isCompleted ? 'bg-emerald-500 dark:bg-emerald-400' : 'bg-red-500 dark:bg-red-400'}`}>
+                              {isCompleted && <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-500 dark:bg-emerald-400 opacity-75"></span>}
+                            </span>
+                            {stateConfig.label}
+                          </Badge>
                           {tx.motivoRechazo && (
-                            <p className="text-xs text-destructive mt-1 max-w-[150px]">{tx.motivoRechazo}</p>
+                            <p className="text-[10px] text-red-600 dark:text-red-400 mt-1 max-w-[150px] font-mono leading-none">{tx.motivoRechazo}</p>
                           )}
                         </TableCell>
-                        <TableCell className="text-right font-mono tabular-nums font-semibold text-sm">
+                        <TableCell className="text-right font-mono tabular-nums font-bold text-sm text-primary">
                           {formatCurrency(tx.monto)}
                         </TableCell>
                       </TableRow>
