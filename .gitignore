@@ -46,3 +46,11 @@ openspec/
 .opencode/
 .opencode.json
 .opencode.jsonc
+
+# Terraform
+terraform/.terraform/
+terraform/terraform.tfstate
+terraform/terraform.tfstate.backup
+terraform/*.tfvars
+terraform/crash.log
+terraform/crash.*.log
