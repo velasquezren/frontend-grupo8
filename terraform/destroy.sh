@@ -1,40 +1,49 @@
 #!/usr/bin/env bash
 #
-# destroy.sh — Tear down ALL AWS resources created by deploy.sh.
+# destroy.sh — Tear down the S3 static website infrastructure.
 #
-# Removes everything (ALB, ECS service + cluster, ECR + images, VPC, NAT
-# Gateway, security groups, IAM, log group) so billing for this stack stops.
-# This cannot be undone.
-#
-# Usage:
-#   ./destroy.sh
+# This will:
+#   1. Empty the S3 bucket (required before Terraform can delete it)
+#   2. Run terraform destroy to remove all resources
 #
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
-# --- prerequisites ----------------------------------------------------------
-for cmd in terraform aws; do
-  command -v "$cmd" >/dev/null 2>&1 || {
-    echo "ERROR: '$cmd' is not installed or not in PATH." >&2; exit 1; }
-done
-aws sts get-caller-identity >/dev/null 2>&1 || {
-  echo "ERROR: not authenticated to AWS." >&2; exit 1; }
-
-# --- confirm (this is destructive) ------------------------------------------
-echo "WARNING: this will destroy ALL Terraform-managed resources in:"
-echo "  $SCRIPT_DIR"
+echo "WARNING: This will destroy the frontend S3 bucket."
 echo
-echo "That includes the ECR repository AND every image pushed to it."
-echo "Nothing in AWS will remain. This CANNOT be undone."
-echo
-read -r -p "Type 'destroy' to confirm: " ans
-[[ "$ans" == "destroy" ]] || { echo "Aborted. Nothing was destroyed."; exit 0; }
+read -r -p "Are you sure? [y/N] " ans
+[[ "$ans" =~ ^[Yy]$ ]] || { echo "Aborted."; exit 0; }
 
-# --- destroy ----------------------------------------------------------------
+BUCKET="$(terraform output -raw s3_bucket_name 2>/dev/null)" || true
+if [ -n "$BUCKET" ]; then
+  echo "==> Emptying S3 bucket: $BUCKET..."
+  aws s3 rm "s3://$BUCKET" --recursive 2>/dev/null || true
+
+  # Also delete old versions if versioning was enabled
+  aws s3api list-object-versions \
+    --bucket "$BUCKET" \
+    --query 'Versions[].{Key:Key,VersionId:VersionId}' \
+    --output json 2>/dev/null | \
+    jq -r '.[] | "--key \(.Key) --version-id \(.VersionId)"' 2>/dev/null | \
+    while read -r args; do
+      eval aws s3api delete-object --bucket "$BUCKET" $args 2>/dev/null || true
+    done
+
+  # Delete markers too
+  aws s3api list-object-versions \
+    --bucket "$BUCKET" \
+    --query 'DeleteMarkers[].{Key:Key,VersionId:VersionId}' \
+    --output json 2>/dev/null | \
+    jq -r '.[] | "--key \(.Key) --version-id \(.VersionId)"' 2>/dev/null | \
+    while read -r args; do
+      eval aws s3api delete-object --bucket "$BUCKET" $args 2>/dev/null || true
+    done
+fi
+
 echo "==> terraform destroy..."
 terraform destroy -auto-approve
 
 echo
-echo "==> All resources destroyed. Billing for this stack has stopped."
+echo "==> Done. Frontend infrastructure has been destroyed."

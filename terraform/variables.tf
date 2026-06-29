@@ -1,13 +1,17 @@
+# -----------------------------------------------------------------------------
+# Variables — S3 + CloudFront static frontend
+# -----------------------------------------------------------------------------
+
 variable "aws_region" {
-  description = "AWS region to deploy all resources into."
+  description = "AWS region for the S3 bucket."
   type        = string
-  default     = "us-east-1"
+  default     = "us-east-2"
 }
 
 variable "project_name" {
   description = "Short project name used to prefix and tag resources (lowercase, no spaces)."
   type        = string
-  default     = "billetera"
+  default     = "banca-g8"
 
   validation {
     condition     = can(regex("^[a-z][a-z0-9-]{1,28}$", var.project_name))
@@ -21,38 +25,25 @@ variable "environment" {
   default     = "dev"
 }
 
-variable "container_port" {
-  description = "Port the Next.js standalone server listens on inside the container."
-  type        = number
-  default     = 3000
-}
-
-variable "app_image_tag" {
-  description = "Tag of the Docker image to deploy from the ECR repository."
-  type        = string
-  default     = "latest"
-}
-
-variable "task_cpu" {
-  description = "CPU units for the ECS task (Fargate valid values: 256, 512, 1024, ...)."
-  type        = number
-  default     = 256
-}
-
-variable "task_memory" {
-  description = "Memory (MiB) for the ECS task. Must be a valid Fargate cpu/memory combo (256/512 is the smallest)."
-  type        = number
-  default     = 512
-}
-
-variable "desired_count" {
-  description = "Number of running ECS task replicas (Fargate tasks)."
-  type        = number
-  default     = 1
-}
-
 variable "backend_url" {
-  description = "Base URL of the backend API, forwarded to the container as BACKEND_URL. Backend is out of scope."
+  description = "Base URL of the backend API Gateway (output api_gateway_url from the backend team). Example: https://abc123.execute-api.us-east-1.amazonaws.com"
   type        = string
   default     = ""
+}
+
+variable "default_root_object" {
+  description = "Default root object served by CloudFront (typically index.html)."
+  type        = string
+  default     = "index.html"
+}
+
+variable "price_class" {
+  description = "CloudFront price class. PriceClass_100 = cheapest (US, Canada, Europe only)."
+  type        = string
+  default     = "PriceClass_100"
+
+  validation {
+    condition     = contains(["PriceClass_100", "PriceClass_200", "PriceClass_All"], var.price_class)
+    error_message = "Must be PriceClass_100, PriceClass_200, or PriceClass_All."
+  }
 }

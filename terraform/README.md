@@ -1,116 +1,126 @@
-# Terraform — Billetera Digital frontend (ECS Fargate)
+# Terraform — Banca Simplificada Frontend (S3 + CloudFront)
 
-Provisions the AWS infrastructure to run the containerized Next.js frontend
-(`Dockerfile`, `output: standalone`) on **ECS Fargate**, behind a public
-**Application Load Balancer**, pulling the image from **ECR**.
+Despliega el frontend Next.js como un **sitio estático** en **Amazon S3** con
+**CloudFront** como CDN global. Este approach es ideal para un frontend que no
+requiere Server-Side Rendering (SSR).
 
-> Scope: frontend only. No HTTPS / ACM / Route 53 / custom domain. Backend is
-> out of scope and is configured via the `BACKEND_URL` variable.
+> **Scope:** Frontend únicamente. El backend (microservicios ECS) es manejado
+> por otro equipo en su propia cuenta AWS. El frontend se conecta al backend
+> vía la URL pública del API Gateway.
 
-## Architecture
+## Arquitectura
 
 ```
-Internet ──► ALB (public subnets, port 80) ──► ECS Fargate tasks (private subnets)
-                                                      │
-                        ECR (image source) ◄────────┤ pulls image
-                                                      └──► CloudWatch Logs
+Internet ──► CloudFront (CDN global, HTTPS)
+                 │
+                 ▼
+             S3 Bucket (privado, archivos estáticos)
+                 │
+                 └── out/          ← Next.js static export
+                     ├── index.html
+                     ├── dashboard.html
+                     ├── cuentas.html
+                     ├── movimientos.html
+                     ├── transferencias.html
+                     ├── perfil.html
+                     └── _next/static/  ← JS, CSS, imágenes
 ```
 
-- **VPC** `10.0.0.0/16` — 2 AZs, 2 public + 2 private subnets.
-- **NAT Gateway** (single, in the first public subnet) so private tasks can
-  reach ECR and the backend. Single NAT chosen to minimize cost.
-- **ALB** internet-facing, HTTP/80, health check on `/`.
-- **ECS service** Fargate, `awsvpc` networking, IP target group.
-- **ECR** with scan-on-push + lifecycle policy (keep last 5 tagged images).
+### Ventajas sobre ECS Fargate
 
-## Prerequisites
+| Aspecto | S3 + CloudFront | ECS Fargate |
+|---------|----------------|-------------|
+| **Costo mensual** | ~$1-3 USD | ~$30-35 USD |
+| **Latencia** | CDN global (edge locations) | Una región |
+| **HTTPS** | ✅ Gratis (certificado CloudFront) | ❌ Requiere ACM + dominio |
+| **Complejidad** | Baja (bucket + CDN) | Alta (VPC, ALB, ECS, ECR, NAT) |
+| **Escalabilidad** | Automática e ilimitada | Manual (desired_count) |
+| **Mantenimiento** | Cero (serverless) | Monitorear tasks/containers |
 
-- AWS credentials configured (e.g. `aws configure` — IAM user with enough
-  permissions to create VPC/ECS/ECR/IAM/ELB/CloudWatch resources).
-- [Terraform](https://developer.hashicorp.com/terraform/downloads) >= 1.5.
-- [Docker](https://docs.docker.com/get-docker/) + [AWS CLI v2](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html).
-- Region: `us-east-1` (override with `-var aws_region=...`).
+## Prerrequisitos
 
-## Deploy
+1. **AWS CLI** configurado (`aws configure`) con permisos para S3, CloudFront, IAM.
+2. **Terraform** >= 1.5 — [Descargar](https://developer.hashicorp.com/terraform/downloads).
+3. **Node.js** >= 18 + npm.
 
-All commands run from the `terraform/` directory.
+## Despliegue
 
-### 1. Provision the infrastructure
+Todos los comandos se ejecutan desde el directorio `terraform/`.
+
+### Opción A: Script automático (recomendada)
 
 ```bash
+chmod +x deploy.sh destroy.sh
+./deploy.sh
+```
+
+El script ejecuta automáticamente:
+1. `terraform apply` → crea el bucket S3 + distribución CloudFront
+2. `npm run build` → genera el export estático en `out/`
+3. `aws s3 sync` → sube los archivos al bucket
+4. Invalida la caché de CloudFront
+5. Imprime la URL pública
+
+### Opción B: Manual paso a paso
+
+```bash
+# 1. Crear infraestructura
 terraform init
-terraform plan
 terraform apply
+
+# 2. Build del frontend
+cd ..
+npm run build
+cd terraform
+
+# 3. Subir archivos
+BUCKET=$(terraform output -raw s3_bucket_name)
+aws s3 sync ../out/ "s3://$BUCKET" --delete
+
+# 4. Invalidar caché
+DIST_ID=$(terraform output -raw cloudfront_distribution_id)
+aws cloudfront create-invalidation --distribution-id "$DIST_ID" --paths "/*"
+
+# 5. Obtener URL
+terraform output -raw cloudfront_url
 ```
 
-`apply` prints the outputs, including `ecr_repository_uri`, `alb_dns_name` and
-`app_url`.
+### Conectar con el Backend
 
-### 2. Build and push the Docker image
-
-> **Order matters:** the ECS service is created during `apply`, but its tasks
-> will stay `PENDING` until an image with the configured tag exists in ECR.
-> Push the image **right after** the first `apply`.
-
-Use the `ecr_repository_uri` output (e.g. `324486142059.dkr.ecr.us-east-1.amazonaws.com/billetera-dev`):
+Cuando el equipo de backend despliegue sus microservicios, pasa la URL del
+API Gateway como variable:
 
 ```bash
-ECR_URI=$(terraform output -raw ecr_repository_uri)
-
-# Log the Docker daemon into ECR
-aws ecr get-login-password --region us-east-1 \
-  | docker login --username AWS --password-stdin "$ECR_URI"
-
-# Build and push (run from the repo root, where the Dockerfile lives)
-docker build -t "$ECR_URI:latest" .
-docker push "$ECR_URI:latest"
+terraform apply -var 'backend_url=https://abc123.execute-api.us-east-1.amazonaws.com'
 ```
 
-If you changed the tag via `-var app_image_tag=v1`, build/push with that tag.
-
-### 3. Access the app
-
-Once a task is `RUNNING` and the target group health check passes:
+### Destruir infraestructura
 
 ```bash
-terraform output -raw app_url
+./destroy.sh
 ```
 
-Open the printed URL in your browser (HTTP only — no TLS in scope).
-
-### 4. Tear down (stop billing)
-
-```bash
-terraform destroy
-```
-
-The NAT Gateway and ALB are the main cost drivers — destroying when idle is the
-single most effective way to avoid surprises.
+> **Nota:** CloudFront puede tardar 5-10 minutos en deshabilitarse y eliminarse.
 
 ## Variables
 
-| Variable          | Default     | Description                                            |
-| ----------------- | ----------- | ------------------------------------------------------ |
-| `aws_region`      | `us-east-1` | AWS region.                                            |
-| `project_name`    | `billetera` | Resource prefix.                                       |
-| `environment`     | `dev`       | Environment name.                                      |
-| `container_port`  | `3000`      | In-container port (Next.js standalone `server.js`).    |
-| `app_image_tag`   | `latest`    | Docker image tag to deploy.                            |
-| `task_cpu`        | `256`       | Fargate CPU units.                                     |
-| `task_memory`     | `512`       | Fargate memory (MiB). Must be a valid cpu/mem combo.   |
-| `desired_count`   | `1`         | Number of tasks.                                       |
-| `backend_url`     | `""`        | Backend API base URL, forwarded as `BACKEND_URL`.      |
+| Variable | Default | Descripción |
+|----------|---------|-------------|
+| `aws_region` | `us-east-1` | Región AWS para el bucket S3 |
+| `project_name` | `banca-g8` | Prefijo para nombrar recursos |
+| `environment` | `dev` | Nombre del entorno |
+| `backend_url` | `""` | URL del API Gateway del backend |
+| `price_class` | `PriceClass_100` | Clase de precio CloudFront (100=más barato) |
+| `default_root_object` | `index.html` | Objeto raíz de CloudFront |
 
-Override with `-var key=value` or a `terraform.tfvars` file (never commit
-secrets to tfvars — it is gitignored).
+## Notas
 
-## Notes / gotchas
-
-- **Next.js standalone binding:** the container sets `HOSTNAME=0.0.0.0` so
-  `server.js` binds to all interfaces. Without it the process listens only on
-  `127.0.0.1` and the ALB health check never succeeds.
-- **Fargate CPU/memory:** 256 CPU / 512 MiB is the smallest valid combo.
-- **ECR login quirk:** `ecr:GetAuthorizationToken` only supports `Resource: "*"`
-  (an AWS limitation), so it is split from the repo-scoped pull permissions.
-- **Single NAT:** both private subnets route through one NAT Gateway — fine for
-  dev, not HA. Add a NAT per AZ for production.
+- **HTTPS automático:** CloudFront provee un certificado TLS por defecto para
+  el dominio `*.cloudfront.net`. No necesitas ACM ni dominio propio.
+- **Caché inteligente:** Los archivos HTML se sirven con `must-revalidate`,
+  mientras los assets (`_next/static/`) se sirven con caché de 1 año
+  (son immutables por el hash en el nombre).
+- **SPA Routing:** CloudFront redirige errores 403/404 a `index.html` para
+  que el routing de Next.js funcione correctamente.
+- **next.config.ts:** Debe tener `output: "export"` para generar archivos
+  estáticos en `out/`. Esto se configura automáticamente en esta rama.
