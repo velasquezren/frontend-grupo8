@@ -1,19 +1,20 @@
 # -----------------------------------------------------------------------------
-# S3 bucket — hosts the Next.js static website (output: "export")
+# S3 bucket — almacena los archivos estáticos del frontend Next.js (export)
 #
-# Configured as a public static website to bypass CloudFront account verification locks.
+# El bucket NO es público. CloudFront accede mediante Origin Access Control (OAC),
+# lo que garantiza que los objetos solo se sirvan a través de la CDN.
 # -----------------------------------------------------------------------------
 
 resource "aws_s3_bucket" "frontend" {
   bucket        = "${var.project_name}-${var.environment}-frontend"
-  force_destroy = true # Allow terraform destroy even if the bucket has objects
+  force_destroy = true # Permite terraform destroy aunque el bucket tenga objetos
 
   tags = {
     Name = "${var.project_name}-${var.environment}-frontend"
   }
 }
 
-# Configure S3 bucket website hosting
+# Configuración de hosting estático del bucket S3
 resource "aws_s3_bucket_website_configuration" "frontend" {
   bucket = aws_s3_bucket.frontend.id
 
@@ -22,21 +23,21 @@ resource "aws_s3_bucket_website_configuration" "frontend" {
   }
 
   error_document {
-    key = var.default_root_object # SPA Routing fallback
+    key = var.default_root_object # Fallback para SPA routing
   }
 }
 
-# Allow public policies so S3 can serve the files to anonymous users
+# Allow CloudFront OAC access but block direct public internet access
 resource "aws_s3_bucket_public_access_block" "frontend" {
   bucket = aws_s3_bucket.frontend.id
 
-  block_public_acls       = false
-  block_public_policy     = false
-  ignore_public_acls      = false
-  restrict_public_buckets = false
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
 }
 
-# Bucket policy: allow anonymous read access to everyone
+# Bucket policy: allow read access only to the CloudFront distribution via OAC
 resource "aws_s3_bucket_policy" "frontend" {
   bucket = aws_s3_bucket.frontend.id
 
@@ -44,19 +45,27 @@ resource "aws_s3_bucket_policy" "frontend" {
     Version = "2012-10-17"
     Statement = [
       {
-        Sid       = "PublicReadGetObject"
+        Sid       = "AllowCloudFrontOAC"
         Effect    = "Allow"
-        Principal = "*"
+        Principal = { Service = "cloudfront.amazonaws.com" }
         Action    = "s3:GetObject"
         Resource  = "${aws_s3_bucket.frontend.arn}/*"
+        Condition = {
+          StringEquals = {
+            "AWS:SourceArn" = aws_cloudfront_distribution.frontend.arn
+          }
+        }
       }
     ]
   })
 
-  depends_on = [aws_s3_bucket_public_access_block.frontend]
+  depends_on = [
+    aws_s3_bucket_public_access_block.frontend,
+    aws_cloudfront_distribution.frontend
+  ]
 }
 
-# Enable versioning for rollback capability
+# Versionamiento habilitado para capacidad de rollback
 resource "aws_s3_bucket_versioning" "frontend" {
   bucket = aws_s3_bucket.frontend.id
 
