@@ -46,3 +46,13 @@ openspec/
 .opencode/
 .opencode.json
 .opencode.jsonc
+
+# Terraform local files
+.terraform/
+*.tfstate
+*.tfstate.backup
+*.tfvars
+*.tfvars.json
+terraform.tfvars
+terraform.tfvars.json
+.terraform.lock.hcl
