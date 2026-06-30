@@ -48,9 +48,16 @@ openspec/
 .opencode.jsonc
 
 # Terraform
+.terraform/
+*.tfstate
+*.tfstate.backup
+*.tfvars
+*.tfvars.json
+terraform.tfvars
+terraform.tfvars.json
+.terraform.lock.hcl
 terraform/.terraform/
 terraform/terraform.tfstate
 terraform/terraform.tfstate.backup
-terraform/*.tfvars
 terraform/crash.log
 terraform/crash.*.log
