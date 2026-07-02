@@ -27,17 +27,17 @@ resource "aws_s3_bucket_website_configuration" "frontend" {
   }
 }
 
-# Allow CloudFront OAC access but block direct public internet access
+# Permitir acceso público de lectura para el sitio web estático de S3
 resource "aws_s3_bucket_public_access_block" "frontend" {
   bucket = aws_s3_bucket.frontend.id
 
-  block_public_acls       = true
-  block_public_policy     = true
-  ignore_public_acls      = true
-  restrict_public_buckets = true
+  block_public_acls       = false
+  block_public_policy     = false
+  ignore_public_acls      = false
+  restrict_public_buckets = false
 }
 
-# Bucket policy: allow read access only to the CloudFront distribution via OAC
+# Política de bucket que permite lectura pública a todos los objetos (requerido para S3 website)
 resource "aws_s3_bucket_policy" "frontend" {
   bucket = aws_s3_bucket.frontend.id
 
@@ -45,23 +45,17 @@ resource "aws_s3_bucket_policy" "frontend" {
     Version = "2012-10-17"
     Statement = [
       {
-        Sid       = "AllowCloudFrontOAC"
+        Sid       = "PublicReadGetObject"
         Effect    = "Allow"
-        Principal = { Service = "cloudfront.amazonaws.com" }
+        Principal = "*"
         Action    = "s3:GetObject"
         Resource  = "${aws_s3_bucket.frontend.arn}/*"
-        Condition = {
-          StringEquals = {
-            "AWS:SourceArn" = aws_cloudfront_distribution.frontend.arn
-          }
-        }
       }
     ]
   })
 
   depends_on = [
-    aws_s3_bucket_public_access_block.frontend,
-    aws_cloudfront_distribution.frontend
+    aws_s3_bucket_public_access_block.frontend
   ]
 }
 

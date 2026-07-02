@@ -19,15 +19,15 @@ output "s3_bucket_arn" {
 
 output "cloudfront_distribution_id" {
   description = "ID de la distribución CloudFront."
-  value       = aws_cloudfront_distribution.frontend.id
+  value       = "N/A"
 }
 
 output "cloudfront_domain_name" {
   description = "URL HTTPS de la distribución CloudFront."
-  value       = "https://${aws_cloudfront_distribution.frontend.domain_name}"
+  value       = "N/A"
 }
 
 output "cloudfront_arn" {
   description = "ARN de la distribución CloudFront."
-  value       = aws_cloudfront_distribution.frontend.arn
+  value       = "N/A"
 }
