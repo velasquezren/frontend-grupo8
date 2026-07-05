@@ -57,7 +57,7 @@ const INITIAL_ALERTS: NotificationAlert[] = [
     titulo: 'Conexión a Backend AWS OK',
     mensaje: 'Sincronizado con API Gateway us-east-1 exitosamente.',
     fecha: 'Hace 1 hora',
-    leida: true,
+    leida: false,
     prioridad: 'normal',
   },
 ]
