@@ -101,33 +101,36 @@ export default function CuentasPage() {
   }
 
   async function handleSave() {
-    if (!formTitular.trim()) {
-      toast.error('Completa todos los campos requeridos')
+    const cleanTitular = formTitular.trim()
+    if (!cleanTitular) {
+      toast.error('Por favor ingresa el nombre del titular')
       return
     }
+
+    const parsedSaldo = parseFloat(formSaldo)
+    const validSaldo = isNaN(parsedSaldo) || parsedSaldo < 0 ? 0 : parsedSaldo
 
     try {
       if (editingAccount) {
         await api.updateAccount(editingAccount.id, {
-          titular: formTitular,
-          saldo: Number(formSaldo) || 0,
+          titular: cleanTitular,
+          saldo: validSaldo,
         })
-        toast.success(`Cuenta de ${formTitular} actualizada`)
+        toast.success(`Cuenta de ${cleanTitular} actualizada`)
       } else {
         await api.createAccount({
-          titular: formTitular,
-          saldo: Number(formSaldo) || 0,
+          titular: cleanTitular,
+          saldo: validSaldo,
         })
-        toast.success(`Cuenta creada para ${formTitular}`)
+        toast.success(`Cuenta creada para ${cleanTitular}`)
       }
+      setDialogOpen(false)
+      resetForm()
       loadAccounts()
     } catch (err: any) {
       console.error(err)
-      toast.error('Error al guardar la cuenta en el servidor')
+      toast.error(err.message || 'Error al guardar la cuenta en el servidor')
     }
-
-    setDialogOpen(false)
-    resetForm()
   }
 
   async function handleDelete(account: Account) {

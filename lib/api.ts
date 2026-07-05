@@ -76,17 +76,22 @@ export const api = {
   },
 
   async createAccount(dto: { titular: string; saldo: number }): Promise<Account> {
+    const ownerName = (dto.titular || '').trim()
+    const balanceNum = Number(dto.saldo) || 0
+    if (!ownerName) {
+      throw new Error('El nombre del titular es requerido')
+    }
     const data = await fetchJSON<any>('/accounts', {
       method: 'POST',
-      body: JSON.stringify({ owner: dto.titular, balance: dto.saldo }),
+      body: JSON.stringify({ owner: ownerName, balance: balanceNum }),
     })
     return mapBackendAccount(data)
   },
 
   async updateAccount(id: string, dto: { titular?: string; saldo?: number }): Promise<Account> {
     const body: any = {}
-    if (dto.titular !== undefined) body.owner = dto.titular
-    if (dto.saldo !== undefined) body.balance = dto.saldo
+    if (dto.titular !== undefined) body.owner = dto.titular.trim()
+    if (dto.saldo !== undefined) body.balance = Number(dto.saldo) || 0
     const data = await fetchJSON<any>(`/accounts/${id}`, {
       method: 'PATCH',
       body: JSON.stringify(body),
