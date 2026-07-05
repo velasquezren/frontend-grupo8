@@ -18,7 +18,8 @@ terraform {
     }
   }
 
-  backend "s3" {}
+  # Estado local — no requiere bucket S3 previo
+  backend "local" {}
 }
 
 provider "aws" {

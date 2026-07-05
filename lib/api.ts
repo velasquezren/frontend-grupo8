@@ -2,7 +2,7 @@ import type { Account, Transfer, Alert } from '@/types'
 
 // URL base del API backend. En produccion, apunta al ALB.
 // Se configura via variable de entorno NEXT_PUBLIC_API_URL.
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api'
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://u5gkfzc94l.execute-api.us-east-1.amazonaws.com'
 
 // --- Helpers internos ---
 

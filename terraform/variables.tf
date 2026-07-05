@@ -5,13 +5,13 @@
 variable "aws_region" {
   description = "AWS region for the S3 bucket."
   type        = string
-  default     = "us-east-2"
+  default     = "us-east-1"
 }
 
 variable "project_name" {
   description = "Short project name used to prefix and tag resources (lowercase, no spaces)."
   type        = string
-  default     = "banca-g8"
+  default     = "banca-g8-v2"
 
   validation {
     condition     = can(regex("^[a-z][a-z0-9-]{1,28}$", var.project_name))
