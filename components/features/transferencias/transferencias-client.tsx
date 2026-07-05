@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useState, useEffect, useTransition } from 'react'
 import { motion, AnimatePresence } from 'motion/react'
 import { PageHeader } from '@/components/shared/page-header'
 import { StatCard } from '@/components/shared/stat-card'
@@ -20,6 +20,7 @@ import {
 import { cn, formatCurrency, formatDate, generateId } from '@/lib/utils'
 import { TRANSFER_STATES, MONTO_ALERTA_ELEVADO } from '@/lib/constants'
 import type { Account, Transfer } from '@/types'
+import { api } from '@/lib/api'
 import { toast } from 'sonner'
 
 interface TransferenciasClientProps {
@@ -29,13 +30,14 @@ interface TransferenciasClientProps {
 
 type FormStep = 'form' | 'processing' | 'receipt'
 
-export function TransferenciasClient({ initialAccounts, initialTransfers }: TransferenciasClientProps) {
+export function TransferenciasClient({ initialAccounts = [], initialTransfers = [] }: TransferenciasClientProps) {
   const [accounts, setAccounts] = useState<Account[]>(initialAccounts)
   const [transfers, setTransfers] = useState<Transfer[]>(initialTransfers)
+  const [isLoading, setIsLoading] = useState(true)
   const [isPending, startTransition] = useTransition()
 
   // Form states
-  const [origenId, setOrigenId] = useState(accounts[0]?.id || '')
+  const [origenId, setOrigenId] = useState('')
   const [destinoId, setDestinoId] = useState('')
   const [monto, setMonto] = useState('')
   const [concepto, setConcepto] = useState('')
@@ -48,6 +50,27 @@ export function TransferenciasClient({ initialAccounts, initialTransfers }: Tran
   // History filters
   const [historySearch, setHistorySearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<'todos' | 'completada' | 'rechazada'>('todos')
+
+  async function loadData() {
+    setIsLoading(true)
+    try {
+      const realAccounts = await api.getAccounts()
+      setAccounts(realAccounts)
+      if (realAccounts.length > 0 && !origenId) {
+        setOrigenId(realAccounts[0].id)
+      }
+      const realTransfers = await api.getTransfers()
+      setTransfers(realTransfers)
+    } catch (err) {
+      console.error('Error cargando datos de transferencias:', err)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    loadData()
+  }, [])
 
   const activeAccounts = accounts.filter((a) => a.estado === 'activa')
   const selectedOrigen = accounts.find((a) => a.id === origenId)
@@ -108,41 +131,35 @@ export function TransferenciasClient({ initialAccounts, initialTransfers }: Tran
 
     try {
       setProcessingStatus(['Iniciando firma digital y token de seguridad...'])
-      await wait(750)
+      await wait(500)
       
       setProcessingStatus((prev) => [...prev, 'Validando fondos y reglas de negocio...'])
-      await wait(750)
+      await wait(500)
       
-      setProcessingStatus((prev) => [...prev, 'Procesando transacción en libro mayor...'])
-      await wait(900)
+      setProcessingStatus((prev) => [...prev, 'Enviando transacción a API Gateway backend...'])
+      
+      // Call real backend API
+      const realTransfer = await api.createTransfer({
+        fromAccountId: origenId,
+        toAccountId: destinoId,
+        amount: amount,
+      })
 
       const origen = accounts.find((a) => a.id === origenId)!
       const destino = accounts.find((a) => a.id === destinoId)!
 
       const newTransfer: Transfer = {
-        id: `TX-${generateId()}`,
-        cuentaOrigenId: origenId,
-        cuentaDestinoId: destinoId,
+        ...realTransfer,
         cuentaOrigen: origen.numeroCuenta,
         cuentaDestino: destino.numeroCuenta,
         titularOrigen: origen.titular,
         titularDestino: destino.titular,
-        monto: amount,
-        moneda: 'BOB',
-        concepto: concepto.trim(),
-        estado: 'completada',
-        fechaCreacion: new Date().toISOString(),
-        fechaProcesamiento: new Date().toISOString(),
+        concepto: concepto.trim() || 'Transferencia',
       }
 
-      // Update locally
-      setAccounts((prev) =>
-        prev.map((a) => {
-          if (a.id === origenId) return { ...a, saldo: a.saldo - amount }
-          if (a.id === destinoId) return { ...a, saldo: a.saldo + amount }
-          return a
-        })
-      )
+      // Refresh accounts from backend
+      const updatedAccounts = await api.getAccounts().catch(() => accounts)
+      setAccounts(updatedAccounts)
 
       setTransfers((prev) => [newTransfer, ...prev])
       setLatestTransfer(newTransfer)
@@ -161,7 +178,8 @@ export function TransferenciasClient({ initialAccounts, initialTransfers }: Tran
       }
 
     } catch (err: any) {
-      toast.error('Ocurrió un error al procesar la transferencia')
+      console.error(err)
+      toast.error('Ocurrió un error al procesar la transferencia en el backend')
       setCurrentStep('form')
     }
   }
