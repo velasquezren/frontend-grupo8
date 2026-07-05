@@ -93,7 +93,7 @@ export const api = {
     if (dto.titular !== undefined) body.owner = dto.titular.trim()
     if (dto.saldo !== undefined) body.balance = Number(dto.saldo) || 0
     const data = await fetchJSON<any>(`/accounts/${id}`, {
-      method: 'PATCH',
+      method: 'PUT',
       body: JSON.stringify(body),
     })
     return mapBackendAccount(data)
