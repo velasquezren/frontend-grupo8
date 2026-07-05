@@ -2,12 +2,12 @@ name: CI Frontend
 
 on:
   push:
-    branches: [ main, terraform-s3-cloudfront ]
+    branches: [ main, frontend-new-backend, terraform-s3-cloudfront ]
     paths-ignore:
       - 'terraform/**'
       - '**.md'
   pull_request:
-    branches: [ main, terraform-s3-cloudfront ]
+    branches: [ main, frontend-new-backend, terraform-s3-cloudfront ]
     paths-ignore:
       - 'terraform/**'
       - '**.md'
@@ -40,7 +40,7 @@ jobs:
       - name: Build Next.js (Static Export)
         run: npm run build
         env:
-          NEXT_PUBLIC_API_URL: 'http://localhost:3000/api'
+          NEXT_PUBLIC_API_URL: 'https://u5gkfzc94l.execute-api.us-east-1.amazonaws.com'
 
   # DevSecOps "shift-left" security scans job running in parallel
   security:
