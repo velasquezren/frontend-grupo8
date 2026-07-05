@@ -100,8 +100,13 @@ export const api = {
 
   // Transferencias
   async getTransfers(): Promise<Transfer[]> {
-    const data = await fetchJSON<any[]>('/accounts/transfers')
-    return data.map(mapBackendTransfer)
+    try {
+      const data = await fetchJSON<any[]>('/accounts/transfers')
+      if (Array.isArray(data)) return data.map(mapBackendTransfer)
+      return []
+    } catch {
+      return []
+    }
   },
 
   async createTransfer(dto: {
@@ -109,20 +114,41 @@ export const api = {
     toAccountId: string
     amount: number
   }): Promise<Transfer> {
-    const data = await fetchJSON<any>('/accounts/transfers', {
+    const data = await fetchJSON<any>('/accounts/transfer', {
       method: 'POST',
       body: JSON.stringify(dto),
     })
-    return mapBackendTransfer(data)
+    return {
+      id: data.transferId || `tx-${Date.now()}`,
+      cuentaOrigenId: dto.fromAccountId,
+      cuentaDestinoId: dto.toAccountId,
+      cuentaOrigen: dto.fromAccountId,
+      cuentaDestino: dto.toAccountId,
+      titularOrigen: dto.fromAccountId,
+      titularDestino: dto.toAccountId,
+      monto: Number(dto.amount),
+      moneda: 'BOB',
+      concepto: 'Transferencia',
+      estado: data.status === 'processing' ? 'procesando' : 'completada',
+      fechaCreacion: new Date().toISOString(),
+    }
   },
 
   // Alertas
   async getAlerts(): Promise<Alert[]> {
-    return fetchJSON<Alert[]>('/accounts/alerts')
+    try {
+      return await fetchJSON<Alert[]>('/accounts/alerts')
+    } catch {
+      return []
+    }
   },
 
   // Health check
-  async healthcheck(): Promise<{ status: string; database: string; ping: string }> {
-    return fetchJSON('/accounts/status/healthcheck')
+  async healthcheck(): Promise<{ status: string }> {
+    try {
+      return await fetchJSON('/accounts/health')
+    } catch {
+      return { status: 'offline' }
+    }
   },
 }
