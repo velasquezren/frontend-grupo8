@@ -22,11 +22,12 @@ async function fetchJSON<T>(path: string, options?: RequestInit): Promise<T> {
 // El backend usa { id, holder, balance } mientras que el frontend usa Account con mas campos.
 
 function mapBackendAccount(raw: any): Account {
+  const ownerName = raw.owner || raw.holder || 'Titular'
   return {
     id: raw.id,
-    titular: raw.holder,
-    email: `${raw.holder?.toLowerCase().replace(/\s+/g, '.')}@email.com`,
-    numeroCuenta: `0010-${raw.id?.replace('ACC-', '') || '0000'}`,
+    titular: ownerName,
+    email: `${ownerName.toLowerCase().replace(/\s+/g, '.')}@email.com`,
+    numeroCuenta: `0010-${raw.id?.replace(/[^a-zA-Z0-9]/g, '').slice(0, 6) || '0000'}`,
     tipo: 'corriente',
     saldo: Number(raw.balance),
     moneda: 'BOB',
@@ -77,14 +78,14 @@ export const api = {
   async createAccount(dto: { titular: string; saldo: number }): Promise<Account> {
     const data = await fetchJSON<any>('/accounts', {
       method: 'POST',
-      body: JSON.stringify({ holder: dto.titular, balance: dto.saldo }),
+      body: JSON.stringify({ owner: dto.titular, balance: dto.saldo }),
     })
     return mapBackendAccount(data)
   },
 
   async updateAccount(id: string, dto: { titular?: string; saldo?: number }): Promise<Account> {
     const body: any = {}
-    if (dto.titular !== undefined) body.holder = dto.titular
+    if (dto.titular !== undefined) body.owner = dto.titular
     if (dto.saldo !== undefined) body.balance = dto.saldo
     const data = await fetchJSON<any>(`/accounts/${id}`, {
       method: 'PATCH',
