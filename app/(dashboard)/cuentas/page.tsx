@@ -20,7 +20,7 @@ import {
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel,
   AlertDialogContent, AlertDialogDescription, AlertDialogFooter,
-  AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
+  AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
@@ -31,7 +31,7 @@ import {
   Pencil, Trash2, DollarSign, Loader2,
 } from 'lucide-react'
 import { api } from '@/lib/api'
-import { formatCurrency, generateAccountNumber, generateId } from '@/lib/utils'
+import { formatCurrency } from '@/lib/utils'
 import { ACCOUNT_STATES, ACCOUNT_TYPES } from '@/lib/constants'
 import type { Account } from '@/types'
 import { toast } from 'sonner'
@@ -61,6 +61,7 @@ export default function CuentasPage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingAccount, setEditingAccount] = useState<Account | null>(null)
+  const [deletingAccount, setDeletingAccount] = useState<Account | null>(null)
 
   // Form state
   const [formTitular, setFormTitular] = useState('')
@@ -133,14 +134,16 @@ export default function CuentasPage() {
     }
   }
 
-  async function handleDelete(account: Account) {
+  async function confirmDelete() {
+    if (!deletingAccount) return
     try {
-      await api.deleteAccount(account.id)
-      toast.success(`Cuenta de ${account.titular} eliminada`)
+      await api.deleteAccount(deletingAccount.id)
+      toast.success(`Cuenta de ${deletingAccount.titular} eliminada`)
+      setDeletingAccount(null)
       loadAccounts()
     } catch (err: any) {
       console.error(err)
-      toast.error('Error al eliminar la cuenta del servidor')
+      toast.error(err.message || 'Error al eliminar la cuenta del servidor')
     }
   }
 
@@ -286,28 +289,13 @@ export default function CuentasPage() {
                                 <Pencil className="mr-2 h-4 w-4" />
                                 Editar
                               </DropdownMenuItem>
-                              <AlertDialog>
-                                <AlertDialogTrigger render={
-                                  <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive hover:bg-destructive/10">
-                                    <Trash2 className="mr-2 h-4 w-4" />
-                                    Eliminar
-                                  </DropdownMenuItem>
-                                } />
-                                <AlertDialogContent>
-                                  <AlertDialogHeader>
-                                    <AlertDialogTitle className="font-bold">¿Eliminar cuenta?</AlertDialogTitle>
-                                    <AlertDialogDescription className="text-xs text-muted-foreground">
-                                      Esta acción eliminará la cuenta de {account.titular} ({account.numeroCuenta}). No se puede deshacer.
-                                    </AlertDialogDescription>
-                                  </AlertDialogHeader>
-                                  <AlertDialogFooter>
-                                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                    <AlertDialogAction onClick={() => handleDelete(account)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-                                      Eliminar
-                                    </AlertDialogAction>
-                                  </AlertDialogFooter>
-                                </AlertDialogContent>
-                              </AlertDialog>
+                              <DropdownMenuItem
+                                onClick={() => setDeletingAccount(account)}
+                                className="text-destructive focus:bg-destructive/10 focus:text-destructive cursor-pointer"
+                              >
+                                <Trash2 className="mr-2 h-4 w-4" />
+                                Eliminar
+                              </DropdownMenuItem>
                             </DropdownMenuContent>
                           </DropdownMenu>
                         </TableCell>
@@ -330,6 +318,24 @@ export default function CuentasPage() {
           </Table>
         </CardContent>
       </Card>
+
+      {/* Delete Confirmation Modal */}
+      <AlertDialog open={!!deletingAccount} onOpenChange={(open) => { if (!open) setDeletingAccount(null) }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="font-bold">¿Eliminar cuenta?</AlertDialogTitle>
+            <AlertDialogDescription className="text-xs text-muted-foreground">
+              Esta acción eliminará la cuenta de {deletingAccount?.titular} ({deletingAccount?.numeroCuenta}). No se puede deshacer.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setDeletingAccount(null)}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }
