@@ -1,12 +1,8 @@
-# Deploy Frontend — Despliega a producción/desarrollo en AWS S3
-# NOTA DE DEFENSA: La rama 'test' está excluida intencionalmente de este flujo.
-# El código en 'test' se procesa en el pipeline de CI (ci.yml) para validación,
-# pero nunca se despliega para prevenir alteraciones en la infraestructura estable.
 name: Deploy Frontend
 
 on:
   push:
-    branches: [ main, frontend-new-backend, terraform-s3-cloudfront ]
+    branches: [ main, develop ]
     paths-ignore:
       - '**.md'
 
