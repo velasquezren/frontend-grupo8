@@ -1,4 +1,5 @@
 import type { Account, Transfer, Alert } from '@/types'
+import { formatCurrency } from '@/lib/utils'
 
 // URL base del API backend. En produccion, apunta al ALB.
 // Se configura via variable de entorno NEXT_PUBLIC_API_URL.
@@ -189,15 +190,21 @@ export const api = {
       }),
     })
 
-    // Obtenemos los nombres de titular locales para mostrarlos bien en el historial
+    // Obtenemos los nombres de titular locales y validamos saldo para la simulación
     let titularOrig = dto.fromAccountId
     let titularDest = dto.toAccountId
+    let isSufficient = true
+    let availableBalance = 0
 
     try {
       const accounts = await this.getAccounts()
       const oAcc = accounts.find((a) => a.id === dto.fromAccountId)
       const dAcc = accounts.find((a) => a.id === dto.toAccountId)
-      if (oAcc) titularOrig = oAcc.titular
+      if (oAcc) {
+        titularOrig = oAcc.titular
+        availableBalance = oAcc.saldo
+        isSufficient = oAcc.saldo >= Number(dto.amount)
+      }
       if (dAcc) titularDest = dAcc.titular
     } catch (e) {
       // fallback a IDs
@@ -214,8 +221,9 @@ export const api = {
       monto: Number(dto.amount),
       moneda: 'BOB',
       concepto: dto.concept || 'Transferencia digital',
-      // Simulamos completada localmente si es exitoso
-      estado: 'completada', 
+      // Si el saldo es insuficiente, simulamos estado rechazado
+      estado: isSufficient ? 'completada' : 'rechazada',
+      motivoRechazo: isSufficient ? undefined : `Saldo insuficiente. Disponible: ${formatCurrency(availableBalance)}`,
       fechaCreacion: new Date().toISOString(),
       fechaProcesamiento: new Date().toISOString(),
     }

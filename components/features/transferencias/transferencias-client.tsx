@@ -117,10 +117,9 @@ export function TransferenciasClient({ initialAccounts = [], initialTransfers = 
       return
     }
     if (selectedOrigen && selectedOrigen.saldo < amount) {
-      toast.error('Saldo insuficiente', {
-        description: `El monto solicitado (${formatCurrency(amount)}) supera el saldo de tu cuenta (${formatCurrency(selectedOrigen.saldo)})`
+      toast.info('Procesando sobregiro', {
+        description: `Enviando transferencia de ${formatCurrency(amount)} con saldo actual de ${formatCurrency(selectedOrigen.saldo)}. El microservicio evaluará la transacción.`
       })
-      return
     }
 
     // Enter processing step
@@ -166,16 +165,22 @@ export function TransferenciasClient({ initialAccounts = [], initialTransfers = 
       setLatestTransfer(newTransfer)
       setCurrentStep('receipt')
       
-      toast.success('Transferencia completada con éxito', {
-        description: `Se han transferido ${formatCurrency(amount)} a ${destino.titular}.`
-      })
-
-      // Heavy amount trigger warning
-      if (amount >= MONTO_ALERTA_ELEVADO) {
-        toast.warning('Alerta de Control de Seguridad', {
-          description: `La transferencia supera el límite establecido (Bs. ${MONTO_ALERTA_ELEVADO}). Se ha generado una alerta automática.`,
-          duration: 6000,
+      if (newTransfer.estado === 'rechazada') {
+        toast.error('Transferencia Rechazada por el Backend', {
+          description: newTransfer.motivoRechazo || 'Saldo insuficiente para procesar la transacción.'
         })
+      } else {
+        toast.success('Transferencia completada con éxito', {
+          description: `Se han transferido ${formatCurrency(amount)} a ${destino.titular}.`
+        })
+
+        // Heavy amount trigger warning
+        if (amount >= MONTO_ALERTA_ELEVADO) {
+          toast.warning('Alerta de Control de Seguridad', {
+            description: `La transferencia supera el límite establecido (Bs. ${MONTO_ALERTA_ELEVADO}). Se ha generado una alerta automática.`,
+            duration: 6000,
+          })
+        }
       }
 
     } catch (err: any) {
@@ -550,7 +555,7 @@ export function TransferenciasClient({ initialAccounts = [], initialTransfers = 
 
                     <Button
                       onClick={handleStartTransfer}
-                      disabled={!origenId || !destinoId || !monto || !concepto.trim() || (selectedOrigen && Number(monto) > selectedOrigen.saldo)}
+                      disabled={!origenId || !destinoId || !monto || !concepto.trim()}
                       className="w-full h-11 text-sm font-semibold shadow-[0_4px_14px_rgba(20,184,166,0.25)] hover:shadow-[0_6px_20px_rgba(20,184,166,0.35)] transition-all flex items-center justify-center gap-2"
                     >
                       <Send className="h-4 w-4" />
@@ -620,7 +625,7 @@ export function TransferenciasClient({ initialAccounts = [], initialTransfers = 
               <div className="relative bg-card border border-border rounded-3xl shadow-2xl overflow-hidden print:border-none print:shadow-none">
                 
                 {/* Visual Top Bar */}
-                <div className="h-2 bg-gradient-to-r from-teal-500 to-emerald-500" />
+                <div className={`h-2 bg-gradient-to-r ${latestTransfer.estado === 'rechazada' ? 'from-red-500 to-rose-600' : 'from-teal-500 to-emerald-500'}`} />
                 
                 {/* Decorative cut circles on the side */}
                 <div className="absolute left-0 top-[280px] -translate-x-1/2 h-6 w-6 bg-background rounded-full border-r border-border print:hidden" />
@@ -629,21 +634,37 @@ export function TransferenciasClient({ initialAccounts = [], initialTransfers = 
                 <div className="p-8 space-y-6">
                   {/* Status header */}
                   <div className="flex flex-col items-center text-center space-y-2.5">
-                    <div className="h-14 w-14 rounded-full bg-emerald-500/10 dark:bg-emerald-500/20 text-emerald-500 flex items-center justify-center shadow-inner">
-                      <CheckCircle2 className="h-8 w-8" />
-                    </div>
-                    <div className="space-y-1">
-                      <h3 className="text-xl font-bold tracking-tight text-foreground">Transferencia Exitosa</h3>
-                      <p className="text-xs text-muted-foreground font-mono">
-                        Comprobante Digital · {latestTransfer.id}
-                      </p>
-                    </div>
+                    {latestTransfer.estado === 'rechazada' ? (
+                      <>
+                        <div className="h-14 w-14 rounded-full bg-red-500/10 dark:bg-red-500/20 text-red-500 flex items-center justify-center shadow-inner">
+                          <XCircle className="h-8 w-8" />
+                        </div>
+                        <div className="space-y-1">
+                          <h3 className="text-xl font-bold tracking-tight text-foreground">Transferencia Fallida</h3>
+                          <p className="text-xs text-muted-foreground font-mono">
+                            Comprobante de Rechazo · {latestTransfer.id}
+                          </p>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <div className="h-14 w-14 rounded-full bg-emerald-500/10 dark:bg-emerald-500/20 text-emerald-500 flex items-center justify-center shadow-inner">
+                          <CheckCircle2 className="h-8 w-8" />
+                        </div>
+                        <div className="space-y-1">
+                          <h3 className="text-xl font-bold tracking-tight text-foreground">Transferencia Exitosa</h3>
+                          <p className="text-xs text-muted-foreground font-mono">
+                            Comprobante Digital · {latestTransfer.id}
+                          </p>
+                        </div>
+                      </>
+                    )}
                   </div>
 
                   {/* Main Transfer Amount */}
                   <div className="bg-muted/40 dark:bg-muted/10 rounded-2xl p-4 text-center border border-border/50">
                     <span className="text-[10px] uppercase font-bold tracking-widest text-muted-foreground block mb-0.5">
-                      Monto Transferido
+                      {latestTransfer.estado === 'rechazada' ? 'Monto Solicitado' : 'Monto Transferido'}
                     </span>
                     <span className="font-mono text-3xl font-bold tracking-tight text-primary tabular-nums">
                       {formatCurrency(latestTransfer.monto)}
@@ -672,10 +693,23 @@ export function TransferenciasClient({ initialAccounts = [], initialTransfers = 
                       <span className="text-muted-foreground">Concepto</span>
                       <span className="font-semibold text-foreground truncate max-w-[200px] italic">{latestTransfer.concepto}</span>
                     </div>
+                    {latestTransfer.estado === 'rechazada' && (
+                      <div className="flex justify-between py-1.5 border-b border-border/40 text-red-500 font-medium">
+                        <span>Motivo de Fallo</span>
+                        <span className="truncate max-w-[200px] text-right text-[11px] font-bold">{latestTransfer.motivoRechazo || 'Saldo insuficiente'}</span>
+                      </div>
+                    )}
                     <div className="flex justify-between py-1.5">
                       <span className="text-muted-foreground">Estado</span>
-                      <Badge variant="default" className="bg-emerald-500 hover:bg-emerald-500 border-none font-medium px-2 py-0 text-[10px] h-5">
-                        Procesada
+                      <Badge 
+                        variant={latestTransfer.estado === 'rechazada' ? 'destructive' : 'default'} 
+                        className={`border-none font-medium px-2 py-0 text-[10px] h-5 ${
+                          latestTransfer.estado === 'rechazada' 
+                            ? 'bg-red-500 hover:bg-red-500 text-white' 
+                            : 'bg-emerald-500 hover:bg-emerald-500'
+                        }`}
+                      >
+                        {latestTransfer.estado === 'rechazada' ? 'Fallida' : 'Procesada'}
                       </Badge>
                     </div>
                   </div>
