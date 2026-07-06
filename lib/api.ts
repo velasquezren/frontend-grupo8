@@ -139,10 +139,13 @@ export const api = {
     }
   },
 
-  // Alertas
+  // Alertas — derivadas de las transferencias procesadas por el microservicio NATS
+  // El backend no expone un endpoint REST de alertas; el worker NATS solo escribe logs a CloudWatch.
   async getAlerts(): Promise<Alert[]> {
     try {
-      return await fetchJSON<Alert[]>('/accounts/alerts')
+      const transfers = await this.getTransfers()
+      const { generateAlertsFromTransfers } = await import('@/lib/alerts')
+      return generateAlertsFromTransfers(transfers)
     } catch {
       return []
     }

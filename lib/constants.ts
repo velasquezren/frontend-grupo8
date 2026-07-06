@@ -3,6 +3,7 @@ import {
   CreditCard,
   ArrowLeftRight,
   Clock,
+  Bell,
   User,
 } from 'lucide-react'
 
@@ -11,6 +12,7 @@ export const NAV_ITEMS = [
   { title: 'Cuentas', href: '/cuentas', icon: CreditCard },
   { title: 'Transferencias', href: '/transferencias', icon: ArrowLeftRight },
   { title: 'Movimientos', href: '/movimientos', icon: Clock },
+  { title: 'Alertas', href: '/alertas', icon: Bell },
   { title: 'Perfil', href: '/perfil', icon: User },
 ] as const
 
