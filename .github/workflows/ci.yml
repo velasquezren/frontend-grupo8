@@ -2,12 +2,12 @@ name: CI Frontend
 
 on:
   push:
-    branches: [ main, frontend-new-backend, terraform-s3-cloudfront ]
+    branches: [ main, frontend-new-backend, terraform-s3-cloudfront, test ]
     paths-ignore:
       - 'terraform/**'
       - '**.md'
   pull_request:
-    branches: [ main, frontend-new-backend, terraform-s3-cloudfront ]
+    branches: [ main, frontend-new-backend, terraform-s3-cloudfront, test ]
     paths-ignore:
       - 'terraform/**'
       - '**.md'

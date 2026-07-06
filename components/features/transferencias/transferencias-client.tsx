@@ -102,6 +102,21 @@ export function TransferenciasClient({ initialAccounts = [], initialTransfers = 
     setMonto('')
   }
 
+  const handleQuickDeposit = async (id: string, currentBalance: number) => {
+    toast.promise(
+      api.updateAccount(id, { saldo: currentBalance + 10000 }).then(async (updated) => {
+        const updatedAccounts = await api.getAccounts().catch(() => accounts)
+        setAccounts(updatedAccounts)
+        return updated
+      }),
+      {
+        loading: 'Depositando fondos en el backend AWS...',
+        success: '¡Depósito exitoso! Se agregaron Bs. 10,000 a la cuenta.',
+        error: 'Error al depositar fondos en el servidor'
+      }
+    )
+  }
+
   const handleStartTransfer = async () => {
     if (!origenId || !destinoId || !monto || !concepto.trim()) {
       toast.error('Completa todos los campos del formulario')
@@ -328,16 +343,28 @@ export function TransferenciasClient({ initialAccounts = [], initialTransfers = 
                               </div>
                             </div>
                           </div>
-                          <div className="text-right space-y-1">
+                                             <div className="text-right space-y-1">
                             <div className="font-mono text-xs font-bold tabular-nums text-primary">
                               {formatCurrency(account.saldo)}
                             </div>
-                            {isSelected && (
-                              <Badge className="bg-primary hover:bg-primary text-[8px] px-1.5 py-0 uppercase tracking-widest font-bold border-none h-4">
-                                Origen
-                              </Badge>
-                            )}
-                          </div>
+                            {isSelected ? (
+                              <div className="flex flex-col items-end gap-1">
+                                <Badge className="bg-primary hover:bg-primary text-[8px] px-1.5 py-0 uppercase tracking-widest font-bold border-none h-4">
+                                  Origen
+                                </Badge>
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    handleQuickDeposit(account.id, account.saldo)
+                                  }}
+                                  className="text-[9px] text-emerald-500 hover:text-emerald-400 hover:underline font-bold"
+                                >
+                                  + Bs. 10,000
+                                </button>
+                              </div>
+                            ) : null}
+                          </div>        
                         </button>
                       )
                     })}
