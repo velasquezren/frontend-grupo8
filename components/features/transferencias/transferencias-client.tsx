@@ -143,6 +143,7 @@ export function TransferenciasClient({ initialAccounts = [], initialTransfers = 
         fromAccountId: origenId,
         toAccountId: destinoId,
         amount: amount,
+        concept: concepto.trim(),
       })
 
       const origen = accounts.find((a) => a.id === origenId)!

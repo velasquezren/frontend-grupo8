@@ -148,40 +148,89 @@ export const api = {
     return fetchJSON(`/accounts/${id}`, { method: 'DELETE' })
   },
 
-  // Transferencias
+  // Transferencias — persistidas localmente en el frontend como fallback
+  // debido a que el backend expone POST /accounts/transfer pero no implementa GET /accounts/transfers.
   async getTransfers(): Promise<Transfer[]> {
+    if (typeof window === 'undefined') return []
     try {
+      // Intentamos consultar al backend por si en el futuro se implementa
       const data = await fetchJSON<any[]>('/accounts/transfers')
-      if (Array.isArray(data)) return data.map(mapBackendTransfer)
-      return []
+      if (Array.isArray(data) && data.length > 0) {
+        return data.map(mapBackendTransfer)
+      }
     } catch {
-      return []
+      // Fallback silencioso al localStorage
     }
+
+    try {
+      const localData = localStorage.getItem('banca-local-transfers')
+      if (localData) {
+        const parsed = JSON.parse(localData)
+        return Array.isArray(parsed) ? parsed : []
+      }
+    } catch (e) {
+      console.error('Error leyendo transferencias del localStorage:', e)
+    }
+    return []
   },
 
   async createTransfer(dto: {
     fromAccountId: string
     toAccountId: string
     amount: number
+    concept?: string
   }): Promise<Transfer> {
     const data = await fetchJSON<any>('/accounts/transfer', {
       method: 'POST',
-      body: JSON.stringify(dto),
+      body: JSON.stringify({
+        fromAccountId: dto.fromAccountId,
+        toAccountId: dto.toAccountId,
+        amount: Number(dto.amount),
+      }),
     })
-    return {
+
+    // Obtenemos los nombres de titular locales para mostrarlos bien en el historial
+    let titularOrig = dto.fromAccountId
+    let titularDest = dto.toAccountId
+
+    try {
+      const accounts = await this.getAccounts()
+      const oAcc = accounts.find((a) => a.id === dto.fromAccountId)
+      const dAcc = accounts.find((a) => a.id === dto.toAccountId)
+      if (oAcc) titularOrig = oAcc.titular
+      if (dAcc) titularDest = dAcc.titular
+    } catch (e) {
+      // fallback a IDs
+    }
+
+    const newTx: Transfer = {
       id: data.transferId || `tx-${Date.now()}`,
       cuentaOrigenId: dto.fromAccountId,
       cuentaDestinoId: dto.toAccountId,
-      cuentaOrigen: dto.fromAccountId,
-      cuentaDestino: dto.toAccountId,
-      titularOrigen: dto.fromAccountId,
-      titularDestino: dto.toAccountId,
+      cuentaOrigen: `0010-${dto.fromAccountId.replace(/[^a-zA-Z0-9]/g, '').slice(0, 6)}`,
+      cuentaDestino: `0010-${dto.toAccountId.replace(/[^a-zA-Z0-9]/g, '').slice(0, 6)}`,
+      titularOrigen: titularOrig,
+      titularDestino: titularDest,
       monto: Number(dto.amount),
       moneda: 'BOB',
-      concepto: 'Transferencia',
-      estado: data.status === 'processing' ? 'procesando' : 'completada',
+      concepto: dto.concept || 'Transferencia digital',
+      // Simulamos completada localmente si es exitoso
+      estado: 'completada', 
       fechaCreacion: new Date().toISOString(),
+      fechaProcesamiento: new Date().toISOString(),
     }
+
+    // Persistimos en localStorage para el historial
+    try {
+      const localData = localStorage.getItem('banca-local-transfers')
+      const list = localData ? JSON.parse(localData) : []
+      list.unshift(newTx)
+      localStorage.setItem('banca-local-transfers', JSON.stringify(list))
+    } catch (e) {
+      console.error('Error guardando transferencia en localStorage:', e)
+    }
+
+    return newTx
   },
 
   // Alertas — derivadas de las transferencias procesadas por el microservicio NATS
