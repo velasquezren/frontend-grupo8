@@ -21,14 +21,47 @@ async function fetchJSON<T>(path: string, options?: RequestInit): Promise<T> {
 // --- Mappers: Backend -> Frontend ---
 // El backend usa { id, holder, balance } mientras que el frontend usa Account con mas campos.
 
+// --- Helpers para persistir el tipo de cuenta localmente ---
+function getAccountType(id: string): 'ahorro' | 'corriente' {
+  if (typeof window === 'undefined') return 'corriente'
+  try {
+    const data = localStorage.getItem('banca-account-types')
+    if (data) {
+      const map = JSON.parse(data)
+      if (map[id]) return map[id]
+    }
+  } catch (e) {
+    console.error('Error leyendo banca-account-types:', e)
+  }
+  
+  // Fallback determinista basado en el ID
+  const lastChar = id?.slice(-1) || '0'
+  const isDigit = /[0-9]/.test(lastChar)
+  const isEven = isDigit && Number(lastChar) % 2 === 0
+  return isEven ? 'corriente' : 'ahorro'
+}
+
+function saveAccountType(id: string, tipo: 'ahorro' | 'corriente'): void {
+  if (typeof window === 'undefined') return
+  try {
+    const data = localStorage.getItem('banca-account-types')
+    const map = data ? JSON.parse(data) : {}
+    map[id] = tipo
+    localStorage.setItem('banca-account-types', JSON.stringify(map))
+  } catch (e) {
+    console.error('Error guardando banca-account-types:', e)
+  }
+}
+
 function mapBackendAccount(raw: any): Account {
   const ownerName = raw.owner || raw.holder || 'Titular'
+  const accountId = raw.id
   return {
-    id: raw.id,
+    id: accountId,
     titular: ownerName,
     email: `${ownerName.toLowerCase().replace(/\s+/g, '.')}@email.com`,
-    numeroCuenta: `0010-${raw.id?.replace(/[^a-zA-Z0-9]/g, '').slice(0, 6) || '0000'}`,
-    tipo: 'corriente',
+    numeroCuenta: `0010-${accountId?.replace(/[^a-zA-Z0-9]/g, '').slice(0, 6) || '0000'}`,
+    tipo: getAccountType(accountId),
     saldo: Number(raw.balance),
     moneda: 'BOB',
     estado: 'activa',
@@ -75,7 +108,7 @@ export const api = {
     return mapBackendAccount(data)
   },
 
-  async createAccount(dto: { titular: string; saldo: number }): Promise<Account> {
+  async createAccount(dto: { titular: string; saldo: number; tipo?: 'ahorro' | 'corriente' }): Promise<Account> {
     const ownerName = (dto.titular || '').trim()
     const balanceNum = Number(dto.saldo) || 0
     if (!ownerName) {
@@ -85,10 +118,16 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ owner: ownerName, balance: balanceNum }),
     })
+    
+    // Si se especificó el tipo de cuenta, lo guardamos localmente
+    if (dto.tipo && data.id) {
+      saveAccountType(data.id, dto.tipo)
+    }
+
     return mapBackendAccount(data)
   },
 
-  async updateAccount(id: string, dto: { titular?: string; saldo?: number }): Promise<Account> {
+  async updateAccount(id: string, dto: { titular?: string; saldo?: number; tipo?: 'ahorro' | 'corriente' }): Promise<Account> {
     const body: any = {}
     if (dto.titular !== undefined) body.owner = dto.titular.trim()
     if (dto.saldo !== undefined) body.balance = Number(dto.saldo) || 0
@@ -96,6 +135,12 @@ export const api = {
       method: 'PUT',
       body: JSON.stringify(body),
     })
+
+    // Si se especificó el tipo de cuenta, lo actualizamos localmente
+    if (dto.tipo) {
+      saveAccountType(id, dto.tipo)
+    }
+
     return mapBackendAccount(data)
   },
 

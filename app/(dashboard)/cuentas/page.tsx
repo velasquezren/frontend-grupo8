@@ -116,12 +116,14 @@ export default function CuentasPage() {
         await api.updateAccount(editingAccount.id, {
           titular: cleanTitular,
           saldo: validSaldo,
+          tipo: formTipo,
         })
         toast.success(`Cuenta de ${cleanTitular} actualizada`)
       } else {
         await api.createAccount({
           titular: cleanTitular,
           saldo: validSaldo,
+          tipo: formTipo,
         })
         toast.success(`Cuenta creada para ${cleanTitular}`)
       }
