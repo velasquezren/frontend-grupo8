@@ -2,7 +2,7 @@ name: Deploy Frontend
 
 on:
   push:
-    branches: [ main, frontend-new-backend, terraform-s3-cloudfront ]
+    branches: [ main, develop ]
     paths-ignore:
       - '**.md'
 
