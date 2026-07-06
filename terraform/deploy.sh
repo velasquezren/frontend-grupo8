@@ -43,7 +43,16 @@ read -r -p "¿Continuar? [y/N] " ans
 
 # --- 1. terraform apply -----------------------------------------------------
 echo "==> terraform init + apply..."
-terraform init -input=false
+if [ ! -d ".terraform" ]; then
+  BUCKET="banca-simplificada-tf-state-324486142059"
+  echo "Inicializando con backend remoto S3 por defecto ($BUCKET)..."
+  terraform init -backend-config="bucket=$BUCKET" -backend-config="key=frontend/terraform.tfstate" -backend-config="region=us-east-1" -backend-config="encrypt=true" -input=false || {
+    echo "Fallo la inicialización con backend-config, intentando inicialización simple..."
+    terraform init -input=false
+  }
+else
+  terraform init -input=false
+fi
 terraform apply -auto-approve
 
 # --- 2. compilar el export estático de Next.js -------------------------------

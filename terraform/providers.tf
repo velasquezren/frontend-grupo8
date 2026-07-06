@@ -18,8 +18,8 @@ terraform {
     }
   }
 
-  # Estado local — no requiere bucket S3 previo
-  backend "local" {}
+  # Estado remoto S3 — recomendado para producción y GitHub Actions
+  backend "s3" {}
 }
 
 provider "aws" {

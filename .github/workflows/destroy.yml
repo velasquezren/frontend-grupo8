@@ -27,7 +27,7 @@ jobs:
     name: Destroy infrastructure
     runs-on: ubuntu-latest
     env:
-      AWS_REGION: us-east-2
+      AWS_REGION: us-east-1
 
     permissions:
       contents: read
@@ -64,8 +64,8 @@ jobs:
       - name: Terraform Init
         working-directory: ${{ env.TF_DIR }}
         run: |
-          BUCKET="${{ secrets.TF_STATE_BUCKET || 'banca-simplificada-tf-state-324486142059' }}"
-          TABLE="${{ secrets.TF_LOCK_TABLE || 'banca-simplificada-tf-lock' }}"
+          BUCKET="${{ secrets.TF_STATE_BUCKET || vars.TF_STATE_BUCKET || 'banca-simplificada-tf-state-324486142059' }}"
+          TABLE="${{ secrets.TF_LOCK_TABLE || vars.TF_LOCK_TABLE || 'banca-simplificada-tf-lock' }}"
           
           # Nota: Usamos us-east-1 para el state bucket y dynamo lock, coincidiendo con el backend si es compartido
           INIT_ARGS="-backend-config=\"bucket=$BUCKET\" -backend-config=\"key=${{ env.TF_STATE_KEY }}\" -backend-config=\"region=us-east-1\" -backend-config=\"encrypt=true\""
@@ -91,7 +91,7 @@ jobs:
         run: |
           set -euo pipefail
           REGION="us-east-1"
-          BUCKET="${{ secrets.TF_STATE_BUCKET || 'banca-simplificada-tf-state-324486142059' }}"
+          BUCKET="${{ secrets.TF_STATE_BUCKET || vars.TF_STATE_BUCKET || 'banca-simplificada-tf-state-324486142059' }}"
           TABLE="${{ env.TF_LOCK_TABLE }}"
 
           echo "→ Borrando todas las versiones del bucket $BUCKET"

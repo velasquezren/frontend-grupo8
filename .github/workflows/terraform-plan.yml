@@ -39,8 +39,8 @@ jobs:
 
       - name: Bootstrap Frontend State (S3 + DynamoDB)
         run: |
-          BUCKET="${{ secrets.TF_STATE_BUCKET || 'banca-simplificada-tf-state-324486142059' }}"
-          TABLE="${{ secrets.TF_LOCK_TABLE || 'banca-simplificada-tf-lock' }}"
+          BUCKET="${{ secrets.TF_STATE_BUCKET || vars.TF_STATE_BUCKET || 'banca-simplificada-tf-state-324486142059' }}"
+          TABLE="${{ secrets.TF_LOCK_TABLE || vars.TF_LOCK_TABLE || 'banca-simplificada-tf-lock' }}"
           
           if [ "${{ env.AWS_REGION }}" = "us-east-1" ]; then
             aws s3api head-bucket --bucket "$BUCKET" 2>/dev/null || aws s3api create-bucket --bucket "$BUCKET" --region ${{ env.AWS_REGION }}
@@ -62,8 +62,8 @@ jobs:
       - name: Terraform Init
         working-directory: ${{ env.TF_DIR }}
         run: |
-          BUCKET="${{ secrets.TF_STATE_BUCKET || 'banca-simplificada-tf-state-324486142059' }}"
-          TABLE="${{ secrets.TF_LOCK_TABLE || 'banca-simplificada-tf-lock' }}"
+          BUCKET="${{ secrets.TF_STATE_BUCKET || vars.TF_STATE_BUCKET || 'banca-simplificada-tf-state-324486142059' }}"
+          TABLE="${{ secrets.TF_LOCK_TABLE || vars.TF_LOCK_TABLE || 'banca-simplificada-tf-lock' }}"
           
           # Nota: Usamos us-east-1 para el state bucket y dynamo lock, coincidiendo con el backend si es compartido
           INIT_ARGS="-backend-config=\"bucket=$BUCKET\" -backend-config=\"key=frontend/terraform.tfstate\" -backend-config=\"region=us-east-1\" -backend-config=\"encrypt=true\""

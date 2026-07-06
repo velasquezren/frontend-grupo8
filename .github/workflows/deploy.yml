@@ -56,21 +56,24 @@ jobs:
       - name: Terraform Init
         working-directory: ${{ env.TF_DIR }}
         run: |
-          BUCKET="${{ secrets.TF_STATE_BUCKET }}"
-          if [ -n "$BUCKET" ]; then
-            echo "Inicializando con backend remoto S3..."
-            terraform init -backend-config="bucket=$BUCKET" -backend-config="key=frontend/terraform.tfstate" -backend-config="region=${{ env.AWS_REGION }}" -backend-config="encrypt=true"
+          BUCKET="${{ secrets.TF_STATE_BUCKET || vars.TF_STATE_BUCKET || 'banca-simplificada-tf-state-324486142059' }}"
+          TABLE="${{ secrets.TF_LOCK_TABLE || vars.TF_LOCK_TABLE || 'banca-simplificada-tf-lock' }}"
+          
+          INIT_ARGS="-backend-config=\"bucket=$BUCKET\" -backend-config=\"key=frontend/terraform.tfstate\" -backend-config=\"region=us-east-1\" -backend-config=\"encrypt=true\""
+          
+          if aws dynamodb describe-table --table-name "$TABLE" --region us-east-1 >/dev/null 2>&1; then
+            INIT_ARGS="$INIT_ARGS -backend-config=\"dynamodb_table=$TABLE\""
+            echo "Inicializando con bloqueo de estado en DynamoDB ($TABLE)."
           else
-            echo "Inicializando con backend local de Terraform..."
-            terraform init
+            echo "Inicializando sin bloqueo de estado (la tabla no existe o no es accesible)."
           fi
+          
+          eval "terraform init $INIT_ARGS"
 
       - name: Terraform Apply
         working-directory: ${{ env.TF_DIR }}
         run: |
           terraform apply -auto-approve -input=false \
-            -var="aws_access_key=${{ secrets.AWS_ACCESS_KEY_ID }}" \
-            -var="aws_secret_key=${{ secrets.AWS_SECRET_ACCESS_KEY }}" \
             -var="backend_url=${{ secrets.NEXT_PUBLIC_API_URL || 'https://u5gkfzc94l.execute-api.us-east-1.amazonaws.com' }}"
 
       - name: Sync Static Assets to S3
