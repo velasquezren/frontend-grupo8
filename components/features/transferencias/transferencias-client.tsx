@@ -36,17 +36,17 @@ export function TransferenciasClient({ initialAccounts = [], initialTransfers = 
   const [isLoading, setIsLoading] = useState(true)
   const [isPending, startTransition] = useTransition()
 
-  // Form states
+  // Form states prueba
   const [origenId, setOrigenId] = useState('')
   const [destinoId, setDestinoId] = useState('')
   const [monto, setMonto] = useState('')
   const [concepto, setConcepto] = useState('')
-  
+
   // UI states
   const [currentStep, setCurrentStep] = useState<FormStep>('form')
   const [processingStatus, setProcessingStatus] = useState<string[]>([])
   const [latestTransfer, setLatestTransfer] = useState<Transfer | null>(null)
-  
+
   // History filters
   const [historySearch, setHistorySearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<'todos' | 'completada' | 'rechazada'>('todos')
@@ -74,7 +74,7 @@ export function TransferenciasClient({ initialAccounts = [], initialTransfers = 
 
   const activeAccounts = accounts.filter((a) => a.estado === 'activa')
   const selectedOrigen = accounts.find((a) => a.id === origenId)
-  
+
   // Stats
   const completedCount = transfers.filter((t) => t.estado === 'completada').length
   const rejectedCount = transfers.filter((t) => t.estado === 'rechazada').length
@@ -146,12 +146,12 @@ export function TransferenciasClient({ initialAccounts = [], initialTransfers = 
     try {
       setProcessingStatus(['Iniciando firma digital y token de seguridad...'])
       await wait(500)
-      
+
       setProcessingStatus((prev) => [...prev, 'Validando fondos y reglas de negocio...'])
       await wait(500)
-      
+
       setProcessingStatus((prev) => [...prev, 'Enviando transacción a API Gateway backend...'])
-      
+
       // Call real backend API
       const realTransfer = await api.createTransfer({
         fromAccountId: origenId,
@@ -179,7 +179,7 @@ export function TransferenciasClient({ initialAccounts = [], initialTransfers = 
       setTransfers((prev) => [newTransfer, ...prev])
       setLatestTransfer(newTransfer)
       setCurrentStep('receipt')
-      
+
       if (newTransfer.estado === 'rechazada') {
         toast.error('Transferencia Rechazada por el Backend', {
           description: newTransfer.motivoRechazo || 'Saldo insuficiente para procesar la transacción.'
@@ -219,13 +219,13 @@ export function TransferenciasClient({ initialAccounts = [], initialTransfers = 
 
   // Filtered transfers list
   const filteredTransfers = transfers.filter((t) => {
-    const matchesSearch = 
+    const matchesSearch =
       t.titularDestino.toLowerCase().includes(historySearch.toLowerCase()) ||
       t.titularOrigen.toLowerCase().includes(historySearch.toLowerCase()) ||
       t.concepto.toLowerCase().includes(historySearch.toLowerCase()) ||
       t.id.toLowerCase().includes(historySearch.toLowerCase())
 
-    const matchesStatus = 
+    const matchesStatus =
       statusFilter === 'todos' || t.estado === statusFilter
 
     return matchesSearch && matchesStatus
@@ -250,30 +250,30 @@ export function TransferenciasClient({ initialAccounts = [], initialTransfers = 
 
       {/* Grid Stats */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard 
-          title="Total Transferido" 
-          value={formatCurrency(totalTransferred)} 
-          icon={ArrowLeftRight} 
-          className="hover:shadow-md hover:border-primary/20 transition-all duration-300" 
+        <StatCard
+          title="Total Transferido"
+          value={formatCurrency(totalTransferred)}
+          icon={ArrowLeftRight}
+          className="hover:shadow-md hover:border-primary/20 transition-all duration-300"
         />
-        <StatCard 
-          title="Completadas" 
-          value={String(completedCount)} 
-          icon={CheckCircle2} 
-          className="hover:shadow-md hover:border-emerald-500/20 transition-all duration-300" 
+        <StatCard
+          title="Completadas"
+          value={String(completedCount)}
+          icon={CheckCircle2}
+          className="hover:shadow-md hover:border-emerald-500/20 transition-all duration-300"
         />
-        <StatCard 
-          title="Rechazadas" 
-          value={String(rejectedCount)} 
-          icon={XCircle} 
-          className="hover:shadow-md hover:border-red-500/20 transition-all duration-300" 
+        <StatCard
+          title="Rechazadas"
+          value={String(rejectedCount)}
+          icon={XCircle}
+          className="hover:shadow-md hover:border-red-500/20 transition-all duration-300"
         />
-        <StatCard 
-          title="Límite de Alerta" 
-          value={formatCurrency(MONTO_ALERTA_ELEVADO)} 
-          icon={AlertTriangle} 
+        <StatCard
+          title="Límite de Alerta"
+          value={formatCurrency(MONTO_ALERTA_ELEVADO)}
+          icon={AlertTriangle}
           description="Monitoreo de montos"
-          className="hover:shadow-md hover:border-amber-500/20 transition-all duration-300" 
+          className="hover:shadow-md hover:border-amber-500/20 transition-all duration-300"
         />
       </div>
 
@@ -343,7 +343,7 @@ export function TransferenciasClient({ initialAccounts = [], initialTransfers = 
                               </div>
                             </div>
                           </div>
-                                             <div className="text-right space-y-1">
+                          <div className="text-right space-y-1">
                             <div className="font-mono text-xs font-bold tabular-nums text-primary">
                               {formatCurrency(account.saldo)}
                             </div>
@@ -364,7 +364,7 @@ export function TransferenciasClient({ initialAccounts = [], initialTransfers = 
                                 </button>
                               </div>
                             ) : null}
-                          </div>        
+                          </div>
                         </button>
                       )
                     })}
@@ -477,7 +477,7 @@ export function TransferenciasClient({ initialAccounts = [], initialTransfers = 
                         Monto (BOB)
                       </Label>
                       {monto && (
-                        <button 
+                        <button
                           onClick={handleClearAmount}
                           className="text-[10px] text-destructive hover:underline font-semibold"
                         >
@@ -650,10 +650,10 @@ export function TransferenciasClient({ initialAccounts = [], initialTransfers = 
             <div className="w-full max-w-md space-y-6">
               {/* Receipt Ticket Body */}
               <div className="relative bg-card border border-border rounded-3xl shadow-2xl overflow-hidden print:border-none print:shadow-none">
-                
+
                 {/* Visual Top Bar */}
                 <div className={`h-2 bg-gradient-to-r ${latestTransfer.estado === 'rechazada' ? 'from-red-500 to-rose-600' : 'from-teal-500 to-emerald-500'}`} />
-                
+
                 {/* Decorative cut circles on the side */}
                 <div className="absolute left-0 top-[280px] -translate-x-1/2 h-6 w-6 bg-background rounded-full border-r border-border print:hidden" />
                 <div className="absolute right-0 top-[280px] translate-x-1/2 h-6 w-6 bg-background rounded-full border-l border-border print:hidden" />
@@ -728,13 +728,12 @@ export function TransferenciasClient({ initialAccounts = [], initialTransfers = 
                     )}
                     <div className="flex justify-between py-1.5">
                       <span className="text-muted-foreground">Estado</span>
-                      <Badge 
-                        variant={latestTransfer.estado === 'rechazada' ? 'destructive' : 'default'} 
-                        className={`border-none font-medium px-2 py-0 text-[10px] h-5 ${
-                          latestTransfer.estado === 'rechazada' 
-                            ? 'bg-red-500 hover:bg-red-500 text-white' 
+                      <Badge
+                        variant={latestTransfer.estado === 'rechazada' ? 'destructive' : 'default'}
+                        className={`border-none font-medium px-2 py-0 text-[10px] h-5 ${latestTransfer.estado === 'rechazada'
+                            ? 'bg-red-500 hover:bg-red-500 text-white'
                             : 'bg-emerald-500 hover:bg-emerald-500'
-                        }`}
+                          }`}
                       >
                         {latestTransfer.estado === 'rechazada' ? 'Fallida' : 'Procesada'}
                       </Badge>
@@ -806,7 +805,7 @@ export function TransferenciasClient({ initialAccounts = [], initialTransfers = 
                 Consulta y filtra las transferencias enviadas o recibidas en la plataforma
               </CardDescription>
             </div>
-            
+
             {/* Search and Filters */}
             <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
               {/* Search */}
@@ -819,7 +818,7 @@ export function TransferenciasClient({ initialAccounts = [], initialTransfers = 
                   onChange={(e) => setHistorySearch(e.target.value)}
                 />
               </div>
-              
+
               {/* State Filter Buttons */}
               <div className="flex rounded-lg border border-border p-0.5 bg-muted/20 h-9">
                 <button
@@ -876,7 +875,7 @@ export function TransferenciasClient({ initialAccounts = [], initialTransfers = 
                 {filteredTransfers.map((tx) => {
                   const stateConfig = TRANSFER_STATES[tx.estado]
                   const isCompleted = tx.estado === 'completada'
-                  
+
                   return (
                     <TableRow key={tx.id} className="hover:bg-muted/50 border-border transition-colors group">
                       <TableCell className="font-mono text-xs text-muted-foreground font-semibold">{tx.id}</TableCell>
