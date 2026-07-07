@@ -20,7 +20,7 @@ import {
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel,
   AlertDialogContent, AlertDialogDescription, AlertDialogFooter,
-  AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
+  AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
@@ -28,22 +28,40 @@ import {
 } from '@/components/ui/dropdown-menu'
 import {
   Plus, CreditCard, Wallet, Search, MoreHorizontal,
-  Pencil, Trash2, DollarSign,
+  Pencil, Trash2, DollarSign, Loader2,
 } from 'lucide-react'
-import { MOCK_ACCOUNTS } from '@/lib/data'
-import { formatCurrency, generateAccountNumber, generateId } from '@/lib/utils'
+import { api } from '@/lib/api'
+import { formatCurrency } from '@/lib/utils'
 import { ACCOUNT_STATES, ACCOUNT_TYPES } from '@/lib/constants'
 import type { Account } from '@/types'
 import { toast } from 'sonner'
 
 export default function CuentasPage() {
-  const [accounts, setAccounts] = useState<Account[]>(MOCK_ACCOUNTS)
+  const [accounts, setAccounts] = useState<Account[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+
+  async function loadAccounts() {
+    setIsLoading(true)
+    try {
+      const data = await api.getAccounts()
+      setAccounts(data)
+    } catch (err: any) {
+      console.error(err)
+      toast.error('Error al cargar las cuentas desde el servidor')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
   useEffect(() => {
     document.title = 'Cuentas | Banca Simplificada'
+    loadAccounts()
   }, [])
+
   const [searchQuery, setSearchQuery] = useState('')
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingAccount, setEditingAccount] = useState<Account | null>(null)
+  const [deletingAccount, setDeletingAccount] = useState<Account | null>(null)
 
   // Form state
   const [formTitular, setFormTitular] = useState('')
@@ -53,9 +71,9 @@ export default function CuentasPage() {
 
   const filteredAccounts = accounts.filter(
     (a) =>
-      a.titular.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      a.numeroCuenta.includes(searchQuery) ||
-      a.email.toLowerCase().includes(searchQuery.toLowerCase())
+      a.titular?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      a.numeroCuenta?.includes(searchQuery) ||
+      a.email?.toLowerCase().includes(searchQuery.toLowerCase())
   )
 
   const totalBalance = accounts.filter((a) => a.estado === 'activa').reduce((s, a) => s + a.saldo, 0)
@@ -77,50 +95,58 @@ export default function CuentasPage() {
   function openEditDialog(account: Account) {
     setEditingAccount(account)
     setFormTitular(account.titular)
-    setFormEmail(account.email)
+    setFormEmail(account.email || '')
     setFormTipo(account.tipo)
     setFormSaldo(String(account.saldo))
     setDialogOpen(true)
   }
 
-  function handleSave() {
-    if (!formTitular.trim() || !formEmail.trim()) {
-      toast.error('Completa todos los campos requeridos')
+  async function handleSave() {
+    const cleanTitular = formTitular.trim()
+    if (!cleanTitular) {
+      toast.error('Por favor ingresa el nombre del titular')
       return
     }
 
-    if (editingAccount) {
-      setAccounts((prev) =>
-        prev.map((a) =>
-          a.id === editingAccount.id
-            ? { ...a, titular: formTitular, email: formEmail, tipo: formTipo, saldo: Number(formSaldo) || a.saldo }
-            : a
-        )
-      )
-      toast.success(`Cuenta de ${formTitular} actualizada`)
-    } else {
-      const newAccount: Account = {
-        id: generateId(),
-        titular: formTitular,
-        email: formEmail,
-        numeroCuenta: generateAccountNumber(),
-        tipo: formTipo,
-        saldo: Number(formSaldo) || 0,
-        moneda: 'BOB',
-        estado: 'activa',
-        creadaEn: new Date().toISOString(),
-      }
-      setAccounts((prev) => [newAccount, ...prev])
-      toast.success(`Cuenta creada para ${formTitular}`)
-    }
+    const parsedSaldo = parseFloat(formSaldo)
+    const validSaldo = isNaN(parsedSaldo) || parsedSaldo < 0 ? 0 : parsedSaldo
 
-    setDialogOpen(false)
-    resetForm()
+    try {
+      if (editingAccount) {
+        await api.updateAccount(editingAccount.id, {
+          titular: cleanTitular,
+          saldo: validSaldo,
+          tipo: formTipo,
+        })
+        toast.success(`Cuenta de ${cleanTitular} actualizada`)
+      } else {
+        await api.createAccount({
+          titular: cleanTitular,
+          saldo: validSaldo,
+          tipo: formTipo,
+        })
+        toast.success(`Cuenta creada para ${cleanTitular}`)
+      }
+      setDialogOpen(false)
+      resetForm()
+      loadAccounts()
+    } catch (err: any) {
+      console.error(err)
+      toast.error(err.message || 'Error al guardar la cuenta en el servidor')
+    }
   }
 
-  function handleDelete(account: Account) {
-    setAccounts((prev) => prev.filter((a) => a.id !== account.id))
-    toast.success(`Cuenta de ${account.titular} eliminada`)
+  async function confirmDelete() {
+    if (!deletingAccount) return
+    try {
+      await api.deleteAccount(deletingAccount.id)
+      toast.success(`Cuenta de ${deletingAccount.titular} eliminada`)
+      setDeletingAccount(null)
+      loadAccounts()
+    } catch (err: any) {
+      console.error(err)
+      toast.error(err.message || 'Error al eliminar la cuenta del servidor')
+    }
   }
 
   return (
@@ -213,89 +239,105 @@ export default function CuentasPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredAccounts.map((account) => {
-                const stateConfig = ACCOUNT_STATES[account.estado]
-                const isActive = account.estado === 'activa'
-                return (
-                  <TableRow key={account.id} className="hover:bg-muted/50 border-border transition-colors">
-                    <TableCell>
-                      <div>
-                        <p className="font-bold text-sm text-foreground">{account.titular}</p>
-                        <p className="text-xs text-muted-foreground">{account.email}</p>
-                      </div>
-                    </TableCell>
-                    <TableCell className="hidden md:table-cell font-mono text-xs text-muted-foreground">{account.numeroCuenta}</TableCell>
-                    <TableCell className="hidden sm:table-cell">
-                      <Badge variant="outline" className="font-mono text-[10px] uppercase tracking-wide px-2 py-0.5 text-muted-foreground">
-                        {ACCOUNT_TYPES[account.tipo]}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={stateConfig.variant} className="relative pl-5 font-medium border-none py-0.5 text-[10px]">
-                        <span className={`absolute left-2 top-1/2 -translate-y-1/2 flex h-1.5 w-1.5 rounded-full ${isActive ? 'bg-emerald-500 dark:bg-emerald-400' : 'bg-slate-400'}`}>
-                          {isActive && <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-500 dark:bg-emerald-400 opacity-75"></span>}
-                        </span>
-                        {stateConfig.label}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right font-mono tabular-nums font-bold text-sm text-primary">
-                      {formatCurrency(account.saldo)}
-                    </TableCell>
-                    <TableCell>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger render={
-                          <Button variant="ghost" size="icon" className="h-8 w-8">
-                            <MoreHorizontal className="h-4 w-4" />
-                            <span className="sr-only">Acciones</span>
-                          </Button>
-                        } />
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => openEditDialog(account)}>
-                            <Pencil className="mr-2 h-4 w-4" />
-                            Editar
-                          </DropdownMenuItem>
-                          <AlertDialog>
-                            <AlertDialogTrigger render={
-                              <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive hover:bg-destructive/10">
-                                <Trash2 className="mr-2 h-4 w-4" />
-                                Eliminar
-                              </DropdownMenuItem>
-                            } />
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle className="font-bold">¿Eliminar cuenta?</AlertDialogTitle>
-                                <AlertDialogDescription className="text-xs text-muted-foreground">
-                                  Esta acción eliminará la cuenta de {account.titular} ({account.numeroCuenta}). No se puede deshacer.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                <AlertDialogAction onClick={() => handleDelete(account)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-                                  Eliminar
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
-                )
-              })}
-              {filteredAccounts.length === 0 && (
+              {isLoading ? (
                 <TableRow>
                   <TableCell colSpan={6} className="h-32 text-center text-xs text-muted-foreground">
                     <div className="flex flex-col items-center justify-center space-y-2">
-                      <Search className="h-8 w-8 text-muted-foreground/30" />
-                      <p>No se encontraron cuentas con el criterio de búsqueda.</p>
+                      <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                      <p>Cargando cuentas desde el servidor...</p>
                     </div>
                   </TableCell>
                 </TableRow>
+              ) : (
+                <>
+                  {filteredAccounts.map((account) => {
+                    const stateConfig = ACCOUNT_STATES[account.estado]
+                    const isActive = account.estado === 'activa'
+                    return (
+                      <TableRow key={account.id} className="hover:bg-muted/50 border-border transition-colors">
+                        <TableCell>
+                          <div>
+                            <p className="font-bold text-sm text-foreground">{account.titular}</p>
+                            <p className="text-xs text-muted-foreground">{account.email}</p>
+                          </div>
+                        </TableCell>
+                        <TableCell className="hidden md:table-cell font-mono text-xs text-muted-foreground">{account.numeroCuenta}</TableCell>
+                        <TableCell className="hidden sm:table-cell">
+                          <Badge variant="outline" className="font-mono text-[10px] uppercase tracking-wide px-2 py-0.5 text-muted-foreground">
+                            {ACCOUNT_TYPES[account.tipo]}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={stateConfig.variant} className="relative pl-5 font-medium border-none py-0.5 text-[10px]">
+                            <span className={`absolute left-2 top-1/2 -translate-y-1/2 flex h-1.5 w-1.5 rounded-full ${isActive ? 'bg-emerald-500 dark:bg-emerald-400' : 'bg-slate-400'}`}>
+                              {isActive && <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-500 dark:bg-emerald-400 opacity-75"></span>}
+                            </span>
+                            {stateConfig.label}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right font-mono tabular-nums font-bold text-sm text-primary">
+                          {formatCurrency(account.saldo)}
+                        </TableCell>
+                        <TableCell>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger render={
+                              <Button variant="ghost" size="icon" className="h-8 w-8">
+                                <MoreHorizontal className="h-4 w-4" />
+                                <span className="sr-only">Acciones</span>
+                              </Button>
+                            } />
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => openEditDialog(account)}>
+                                <Pencil className="mr-2 h-4 w-4" />
+                                Editar
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={() => setDeletingAccount(account)}
+                                className="text-destructive focus:bg-destructive/10 focus:text-destructive cursor-pointer"
+                              >
+                                <Trash2 className="mr-2 h-4 w-4" />
+                                Eliminar
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </TableCell>
+                      </TableRow>
+                    )
+                  })}
+                  {filteredAccounts.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={6} className="h-32 text-center text-xs text-muted-foreground">
+                        <div className="flex flex-col items-center justify-center space-y-2">
+                          <Search className="h-8 w-8 text-muted-foreground/30" />
+                          <p>No se encontraron cuentas con el criterio de búsqueda.</p>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </>
               )}
             </TableBody>
           </Table>
         </CardContent>
       </Card>
+
+      {/* Delete Confirmation Modal */}
+      <AlertDialog open={!!deletingAccount} onOpenChange={(open) => { if (!open) setDeletingAccount(null) }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="font-bold">¿Eliminar cuenta?</AlertDialogTitle>
+            <AlertDialogDescription className="text-xs text-muted-foreground">
+              Esta acción eliminará la cuenta de {deletingAccount?.titular} ({deletingAccount?.numeroCuenta}). No se puede deshacer.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setDeletingAccount(null)}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }
