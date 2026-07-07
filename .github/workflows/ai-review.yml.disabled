@@ -1,0 +1,47 @@
+name: AI Code Review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+  issue_comment:
+    types: [created]
+  pull_request_review_comment:
+    types: [created]
+
+jobs:
+  claude-review:
+    name: Claude reviews this PR
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+      id-token: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Run Claude Code Review
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          claude_args: '--model claude-sonnet-4-6'
+          prompt: |
+            Sos un reviewer experto de Next.js, React, TailwindCSS, Terraform y CI/CD.
+            Revisá los cambios de este Pull Request y dejá comentarios
+            inline (no un comentario gigante al final) sobre:
+
+              1. Bugs reales o errores lógicos en componentes o Server Actions.
+              2. Problemas de seguridad (inyección de HTML/JS, secretos expuestos en variables de entorno públicas, CORS, etc.).
+              3. Inconsistencias con el resto del repo (naming, patrones de Tailwind, etc.).
+              4. Simplificaciones obvias y optimizaciones (re-renders, carga diferida, código duplicado).
+
+            Reglas:
+              - Sé conciso. Un comentario por hallazgo, sin párrafos.
+              - No comentes cosas obvias ni elogios.
+              - Si no hay nada que decir en un archivo, no comentes nada.
+              - Respondé en español.

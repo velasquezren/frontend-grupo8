@@ -1,0 +1,130 @@
+name: Destroy Frontend Infrastructure
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Escribí "destroy" para confirmar (case-sensitive)'
+        required: true
+        type: string
+      delete_state_backend:
+        description: 'También borrar bucket S3 + tabla DynamoDB del state'
+        required: false
+        type: boolean
+        default: false
+
+concurrency:
+  group: deploy-frontend-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  TF_DIR: terraform
+  TF_STATE_KEY: frontend/terraform.tfstate
+  TF_LOCK_TABLE: banca-simplificada-tf-lock
+
+jobs:
+  destroy:
+    name: Destroy infrastructure
+    runs-on: ubuntu-latest
+    env:
+      AWS_REGION: us-east-1
+
+    permissions:
+      contents: read
+
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - name: Validate confirmation
+        run: |
+          if [[ "${{ inputs.confirm }}" != "destroy" ]]; then
+            echo "::error::Debés escribir exactamente 'destroy' para confirmar. Recibido: '${{ inputs.confirm }}'"
+            exit 1
+          fi
+
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.9.8
+          terraform_wrapper: false
+
+      - name: Terraform Init
+        working-directory: ${{ env.TF_DIR }}
+        run: |
+          BUCKET="${{ secrets.TF_STATE_BUCKET || vars.TF_STATE_BUCKET || 'banca-simplificada-tf-state-324486142059' }}"
+          TABLE="${{ secrets.TF_LOCK_TABLE || vars.TF_LOCK_TABLE || 'banca-simplificada-tf-lock' }}"
+          
+          # Nota: Usamos us-east-1 para el state bucket y dynamo lock, coincidiendo con el backend si es compartido
+          INIT_ARGS="-backend-config=\"bucket=$BUCKET\" -backend-config=\"key=${{ env.TF_STATE_KEY }}\" -backend-config=\"region=us-east-1\" -backend-config=\"encrypt=true\""
+          
+          if aws dynamodb describe-table --table-name "$TABLE" --region us-east-1 >/dev/null 2>&1; then
+            INIT_ARGS="$INIT_ARGS -backend-config=\"dynamodb_table=$TABLE\""
+            echo "Inicializando con bloqueo de estado en DynamoDB ($TABLE)."
+          else
+            echo "Inicializando sin bloqueo de estado (la tabla no existe o no es accesible)."
+          fi
+          
+          eval "terraform init $INIT_ARGS"
+
+      - name: Terraform Destroy
+        working-directory: ${{ env.TF_DIR }}
+        run: |
+          terraform destroy -auto-approve -input=false \
+            -var="backend_url=${{ secrets.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api' }}"
+
+      # Borrar el backend (bucket + tabla) solo si se pidió explícitamente.
+      - name: Delete state backend (opcional)
+        if: ${{ inputs.delete_state_backend }}
+        run: |
+          set -euo pipefail
+          REGION="us-east-1"
+          BUCKET="${{ secrets.TF_STATE_BUCKET || vars.TF_STATE_BUCKET || 'banca-simplificada-tf-state-324486142059' }}"
+          TABLE="${{ env.TF_LOCK_TABLE }}"
+
+          echo "→ Borrando todas las versiones del bucket $BUCKET"
+          aws s3api list-object-versions --bucket "$BUCKET" \
+            --query '{Objects: Versions[].{Key:Key,VersionId:VersionId}}' --output json \
+            > /tmp/versions.json
+          if [[ "$(jq '.Objects | length' /tmp/versions.json)" -gt 0 ]]; then
+            aws s3api delete-objects --bucket "$BUCKET" --delete file:///tmp/versions.json >/dev/null
+          fi
+
+          aws s3api list-object-versions --bucket "$BUCKET" \
+            --query '{Objects: DeleteMarkers[].{Key:Key,VersionId:VersionId}}' --output json \
+            > /tmp/markers.json
+          if [[ "$(jq '.Objects | length' /tmp/markers.json)" -gt 0 ]]; then
+            aws s3api delete-objects --bucket "$BUCKET" --delete file:///tmp/markers.json >/dev/null
+          fi
+
+          aws s3api delete-bucket --bucket "$BUCKET" --region "$REGION"
+          echo "✔ Bucket $BUCKET eliminado"
+
+          aws dynamodb delete-table --table-name "$TABLE" --region "$REGION" >/dev/null
+          echo "✔ Tabla $TABLE eliminada"
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "## Destroy Frontend Completado ❌"
+            echo ""
+            echo "- **Recursos AWS:** destruidos"
+            if [[ "${{ inputs.delete_state_backend }}" == "true" ]]; then
+              echo "- **State backend (S3 + DynamoDB):** eliminado"
+            else
+              echo "- **State backend:** conservado (re-deploy futuro reutiliza)"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"

@@ -1,0 +1,96 @@
+name: CI Frontend
+
+on:
+  push:
+    branches: [ main, develop, test ]
+    paths-ignore:
+      - 'terraform/**'
+      - '**.md'
+  pull_request:
+    branches: [ main, develop, test ]
+    paths-ignore:
+      - 'terraform/**'
+      - '**.md'
+
+concurrency:
+  group: ci-frontend-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Lint and Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Run Lint
+        run: npm run lint
+
+      - name: Build Next.js (Static Export)
+        run: npm run build
+        env:
+          NEXT_PUBLIC_API_URL: 'https://u5gkfzc94l.execute-api.us-east-1.amazonaws.com'
+
+  # DevSecOps "shift-left" security scans job running in parallel
+  security:
+    name: Security scans
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      security-events: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # 1. Secretos en el repo (AWS keys, tokens, etc.).
+      - name: Gitleaks — scan secrets
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # 2. Setup Node y dependencias de npm.
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      # 3. Vulnerabilidades en dependencias de npm.
+      - name: npm audit
+        run: npm audit --audit-level=high
+        continue-on-error: true
+
+      # 4. CVEs en filesystem + Dockerfiles.
+      - name: Trivy — scan filesystem
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: fs
+          scan-ref: .
+          severity: CRITICAL,HIGH
+          exit-code: '0'
+          format: table
+
+      # 5. Misconfiguraciones en Terraform (IaC security).
+      - name: tfsec — scan Terraform
+        uses: aquasecurity/tfsec-action@v1.0.3
+        with:
+          working_directory: terraform
+          soft_fail: true
